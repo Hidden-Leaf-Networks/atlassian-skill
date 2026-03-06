@@ -1,6 +1,6 @@
 {
   "name": "@hidden-leaf/atlassian-skill",
-  "version": "0.5.5",
+  "version": "0.6.0",
   "description": "Unified Atlassian Claude Code Skill for Jira and Confluence integration",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -14,6 +14,7 @@
   },
   "files": [
     "dist",
+    "scripts",
     "SKILL.md",
     "CLAUDE.snippet.md",
     ".env.example"
@@ -24,7 +25,8 @@
     "lint": "eslint 'src/**/*.ts'",
     "test": "jest --passWithNoTests",
     "clean": "rm -rf dist",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "postinstall": "node scripts/postinstall.js"
   },
   "keywords": [
     "atlassian",
