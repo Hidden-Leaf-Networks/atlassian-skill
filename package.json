@@ -15,6 +15,7 @@
   "files": [
     "dist",
     "SKILL.md",
+    "CLAUDE.snippet.md",
     ".env.example"
   ],
   "scripts": {
