@@ -163,16 +163,19 @@ Use `WorkflowManager` (or `createWorkflowManager(jiraClient)`) to configure boar
 - `listStatuses()` -- list all statuses in the Jira instance
 - `getProjectStatuses(projectKey)` -- get statuses available per issue type
 - `getBoardColumns(boardId)` -- get board column configuration
+- `isWorkflowLocked(projectKey)` -- check if the workflow is locked (409 from Jira)
 
 **Write operations:**
 - `ensureStatuses(statuses)` -- create statuses that don't exist yet; returns created + existing
-- `updateWorkflow(projectKey, statuses)` -- update the project's workflow with new statuses and global transitions
+- `updateWorkflow(projectKey, statuses)` -- update the project's workflow with new statuses and global transitions; throws `WorkflowLockError` if locked
 - `applyPreset(projectKey, presetName)` -- apply a workflow preset (creates statuses + updates workflow)
 - `applyWorkflowPreset(projectKey, preset)` -- apply a custom WorkflowPreset
 
 **Presets:**
 - `listPresets()` -- list available workflow presets
 - `getPresetLabelMapping(presetName)` -- get label-to-status mapping for BoardSync integration
+
+**Lock detection:** `applyPreset` returns `workflowLocked: true` if Jira's workflow API is locked (known platform bug). When locked, statuses are still created — users just need to configure board columns manually via Jira UI.
 
 Available presets:
 - `hln-sdlc` -- Full SDLC: Todo -> In Planning -> In Development -> Development Complete -> Ready for QA -> In QA -> Verified in QA -> Done

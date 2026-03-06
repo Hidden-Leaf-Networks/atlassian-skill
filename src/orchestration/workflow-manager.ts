@@ -64,10 +64,24 @@ export interface ApplyPresetResult {
   existingStatuses: StatusInfo[];
   /** Whether the workflow was updated */
   workflowUpdated: boolean;
+  /** Whether the workflow is locked (409 from Jira) */
+  workflowLocked: boolean;
   /** Errors encountered */
   errors: string[];
   /** Human-readable summary */
   summary: string;
+}
+
+export class WorkflowLockError extends Error {
+  constructor(projectKey: string) {
+    super(
+      `Workflow for project ${projectKey} is locked by Jira ("Other workflow updates are in progress"). ` +
+      `This is a known Jira Cloud platform bug that can occur after workflow API calls on simplified workflows. ` +
+      `Resolution: Open the Jira board settings UI and manually configure the board columns, ` +
+      `or contact Atlassian support to clear the lock.`,
+    );
+    this.name = 'WorkflowLockError';
+  }
 }
 
 // =============================================================================
@@ -466,7 +480,49 @@ export class WorkflowManager {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       this.logger.error(`Failed to update workflow: ${msg}`);
+
+      // Detect the persistent 409 workflow lock
+      if (msg.includes('Other workflow updates are in progress')) {
+        throw new WorkflowLockError(projectKey);
+      }
+
       throw new Error(`Failed to update workflow: ${msg}`);
+    }
+  }
+
+  /**
+   * Check if a project's workflow is locked (409 from Jira).
+   * Returns true if the workflow cannot be modified via API.
+   */
+  async isWorkflowLocked(projectKey: string): Promise<boolean> {
+    try {
+      const workflowInfo = await this.getProjectWorkflow(projectKey);
+      // Attempt a no-op update with the existing statuses to test the lock
+      const statuses = workflowInfo.statuses;
+      if (statuses.length === 0) return false;
+
+      await (this.jiraClient as any).post('/rest/api/3/workflows/update', {
+        statuses: statuses.map(s => ({
+          id: s.id, name: s.name, statusReference: s.id, statusCategory: s.category,
+        })),
+        workflows: [{
+          version: { versionNumber: 1, id: workflowInfo.entityId },
+          id: workflowInfo.entityId,
+          statuses: statuses.map(s => ({
+            statusReference: s.id,
+            properties: { 'jira.issue.editable': 'true' },
+          })),
+          transitions: workflowInfo.transitions.map(t => ({
+            id: t.id, name: t.name, description: '', from: [],
+            to: { statusReference: t.to }, type: t.type.toUpperCase(),
+            rules: { validators: [], postFunctions: [] },
+          })),
+        }],
+      });
+      return false; // If it succeeds, not locked
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return msg.includes('Other workflow updates are in progress');
     }
   }
 
@@ -518,6 +574,7 @@ export class WorkflowManager {
         createdStatuses: [],
         existingStatuses: [],
         workflowUpdated: false,
+        workflowLocked: false,
         errors,
         summary: `Failed to apply "${preset.name}" preset: ${msg}`,
       };
@@ -526,12 +583,18 @@ export class WorkflowManager {
     // Step 2: Update the workflow
     const allStatuses = [...existingStatuses, ...createdStatuses];
     let workflowUpdated = false;
+    let workflowLocked = false;
 
     try {
       workflowUpdated = await this.updateWorkflow(projectKey, allStatuses);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      errors.push(`Workflow update failed: ${msg}`);
+      if (err instanceof WorkflowLockError) {
+        workflowLocked = true;
+        errors.push(err.message);
+      } else {
+        const msg = err instanceof Error ? err.message : String(err);
+        errors.push(`Workflow update failed: ${msg}`);
+      }
     }
 
     // Step 3: Build summary
@@ -549,17 +612,24 @@ export class WorkflowManager {
 
     if (workflowUpdated) {
       lines.push('  Workflow updated successfully');
+    } else if (workflowLocked) {
+      lines.push('  WARNING: Workflow is locked by Jira (known platform bug).');
+      lines.push('  Statuses are ready — configure board columns manually in Jira board settings.');
+      lines.push(`  Column order: ${preset.statuses.map(s => s.name).join(' -> ')}`);
     } else if (errors.length > 0) {
       lines.push(`  Workflow update failed: ${errors[errors.length - 1]}`);
     }
 
-    lines.push(`  Board columns: ${preset.statuses.map(s => s.name).join(' -> ')}`);
+    if (!workflowLocked) {
+      lines.push(`  Board columns: ${preset.statuses.map(s => s.name).join(' -> ')}`);
+    }
 
     return {
       success: errors.length === 0,
       createdStatuses,
       existingStatuses,
       workflowUpdated,
+      workflowLocked,
       errors,
       summary: lines.join('\n'),
     };
