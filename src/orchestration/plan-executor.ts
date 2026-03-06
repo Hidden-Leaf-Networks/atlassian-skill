@@ -131,8 +131,6 @@ export class PlanExecutor {
     const errors: PlanExecutionResult['errors'] = [];
     // Maps item title -> created issue key (used for dependency linking)
     const titleToKey = new Map<string, string>();
-    let epicKey: string | undefined;
-
     // Process each top-level item
     for (const item of input.items) {
       try {
@@ -153,7 +151,7 @@ export class PlanExecutor {
     }
 
     // Determine epic key (first epic created, if any)
-    epicKey = createdIssues.find(i => i.type === 'Epic')?.key;
+    const epicKey = createdIssues.find(i => i.type === 'Epic')?.key;
 
     // Move to sprint if requested
     if (input.sprintId && createdIssues.length > 0) {

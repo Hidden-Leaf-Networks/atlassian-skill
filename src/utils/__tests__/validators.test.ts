@@ -11,7 +11,6 @@ import {
   validateUrl,
   throwIfInvalid,
   combineValidations,
-  HLN_LABEL_PREFIXES,
 } from '../validators';
 import { ValidationError } from '../../core/types';
 

@@ -519,8 +519,8 @@ export class SprintPlanner {
 
     let committedPoints = 0;
     let completedPoints = 0;
-    let addedPoints = 0;
-    let removedPoints = 0;
+    const addedPoints = 0;
+    const removedPoints = 0;
 
     const committedIssues = issues.filter(_i => {
       // Issues that were in the sprint at the start

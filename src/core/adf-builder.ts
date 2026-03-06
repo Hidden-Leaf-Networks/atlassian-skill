@@ -617,7 +617,7 @@ function parseInlineFormatting(text: string): TextBuilder {
     }
 
     // Plain text until next special character
-    const plainMatch = remaining.match(/^[^*`\[]+/);
+    const plainMatch = remaining.match(/^[^*`[]+/);
     if (plainMatch) {
       builder.text(plainMatch[0]);
       remaining = remaining.slice(plainMatch[0].length);

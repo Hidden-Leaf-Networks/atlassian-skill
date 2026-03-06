@@ -33,7 +33,7 @@ export const BRANCH_PREFIXES: Record<WorkType, string> = {
 /**
  * Characters not allowed in branch names
  */
-const INVALID_BRANCH_CHARS = /[~^:?*\[\]\\@{}\s]/g;
+const INVALID_BRANCH_CHARS = /[~^:?*[\]\\@{}\s]/g;
 
 /**
  * Pattern to match issue keys in branch names

@@ -1,4 +1,4 @@
-import { JqlBuilder, jql, JqlFunctions, JqlTemplates } from '../jql-builder';
+import { jql, JqlFunctions, JqlTemplates } from '../jql-builder';
 
 describe('JqlBuilder', () => {
   describe('equals', () => {

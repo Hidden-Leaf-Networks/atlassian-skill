@@ -597,18 +597,19 @@ function generateContributorsList(
   const sorted = Array.from(contributors.values()).sort((a, b) => b.count - a.count);
 
   switch (opts.format) {
-    case 'confluence':
+    case 'confluence': {
       const confluenceItems = sorted.map(c => `<li>${escapeHTML(c.name)} (${c.count} issues)</li>`);
       return `<h3>Contributors</h3>\n<ul>${confluenceItems.join('')}</ul>`;
-
-    case 'html':
+    }
+    case 'html': {
       const htmlItems = sorted.map(c => `    <li>${escapeHTML(c.name)} (${c.count} issues)</li>`);
       return `<section class="contributors">\n  <h3>Contributors</h3>\n  <ul>\n${htmlItems.join('\n')}\n  </ul>\n</section>`;
-
+    }
     case 'markdown':
-    default:
+    default: {
       const mdItems = sorted.map(c => `- ${c.name} (${c.count} issues)`);
       return `### Contributors\n\n${mdItems.join('\n')}`;
+    }
   }
 }
 

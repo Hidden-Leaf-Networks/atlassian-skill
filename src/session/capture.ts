@@ -4,6 +4,7 @@
  */
 
 import { execSync } from 'child_process';
+import { readFileSync } from 'fs';
 import { createLoggerFromEnv, Logger } from '../utils/logger.js';
 import {
   SessionEvent,
@@ -412,8 +413,9 @@ export class SessionCapture {
 
   private getProjectName(workingDirectory: string): string | undefined {
     try {
-      const packageJson = require(`${workingDirectory}/package.json`);
-      return packageJson.name;
+      const raw = readFileSync(`${workingDirectory}/package.json`, 'utf-8');
+      const packageJson = JSON.parse(raw);
+      return packageJson.name as string;
     } catch {
       return workingDirectory.split('/').pop();
     }

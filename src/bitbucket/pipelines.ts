@@ -456,7 +456,7 @@ export class PipelineOperations {
 
     let lastState: PipelineStateType | null = null;
 
-    while (true) {
+    for (;;) {
       const pipeline = await this.getPipelineStatus(workspace, repoSlug, uuid);
       const currentState = pipeline.state.name;
 

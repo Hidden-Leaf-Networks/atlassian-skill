@@ -585,7 +585,7 @@ export class DeploymentOperations {
     return this.updateEnvironment(workspace, repoSlug, envUuid, {
       // Note: The actual lock configuration depends on Bitbucket API version
       // This may need to be adjusted based on the API
-    } as any);
+    } as Partial<Environment>);
   }
 
   /**
@@ -603,7 +603,7 @@ export class DeploymentOperations {
   ): Promise<Environment> {
     return this.updateEnvironment(workspace, repoSlug, envUuid, {
       // Note: The actual unlock configuration depends on Bitbucket API version
-    } as any);
+    } as Partial<Environment>);
   }
 
   // ===========================================================================
