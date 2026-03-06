@@ -2,9 +2,9 @@
 
 **Open infrastructure for AI-native software teams.**
 
-[![Build](https://img.shields.io/github/actions/workflow/status/hidden-leaf-networks/atlassian-skill/ci.yml?branch=main)](https://github.com/hidden-leaf-networks/atlassian-skill/actions)
+[![Build](https://github.com/Hidden-Leaf-Networks/atlassian-skill/actions/workflows/ci.yml/badge.svg)](https://github.com/Hidden-Leaf-Networks/atlassian-skill/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-[![npm](https://img.shields.io/npm/v/@hidden-leaf/atlassian-skill)](https://www.npmjs.com/package/@hidden-leaf/atlassian-skill)
+[![Version](https://img.shields.io/badge/version-0.5.5-green.svg)](https://github.com/Hidden-Leaf-Networks/atlassian-skill)
 
 ---
 

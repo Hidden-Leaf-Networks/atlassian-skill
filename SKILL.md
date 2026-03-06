@@ -1,240 +1,284 @@
 # Atlassian Skill
 
-A comprehensive Claude Code skill for integrating with Atlassian products: Jira, Confluence, and Bitbucket.
+## When to use this skill
 
-## Overview
-
-This skill enables Claude Code to:
-- **Read/Write Jira**: Search issues, create/update tickets, manage sprints, transition workflows
-- **Manage Confluence**: Create/update pages, sync documentation, archive session transcripts
-- **Integrate Bitbucket**: Create PRs, monitor pipelines, link commits to Jira issues
-- **Orchestrate SDLC**: Automate branch naming, changelog generation, PR descriptions
-- **Capture Sessions**: Archive Claude Code session transcripts to Confluence/Jira
+Activate this skill when the user:
+- Mentions Jira, Confluence, Bitbucket, or Atlassian
+- Asks to create, update, search, or transition tickets/issues
+- Asks to create a PR, link work to a ticket, or generate branch names
+- Wants to plan work, create epics, organize tasks, or manage sprints
+- Asks to archive or document a coding session
+- Mentions sprint planning, backlog grooming, velocity, or triage
+- Wants to generate changelogs or PR descriptions from Jira data
+- Asks to create or update Confluence pages
 
 ## Setup
 
-### Environment Variables
+The skill reads configuration from environment variables. See `.env.example` for the full list. At minimum, you need:
+- `ATLASSIAN_CLOUD_ID` and `ATLASSIAN_SITE_URL`
+- Either `ATLASSIAN_USER_EMAIL` + `ATLASSIAN_API_TOKEN` (dev) or OAuth tokens (prod)
 
-Create a `.env` file with your Atlassian credentials:
+## Capabilities
 
-```bash
-# Required: Atlassian Cloud Configuration
-ATLASSIAN_CLOUD_ID=your-cloud-id
-ATLASSIAN_SITE_URL=https://your-domain.atlassian.net
+### Jira Operations
 
-# Option 1: OAuth 2.0 (Recommended for production)
-ATLASSIAN_CLIENT_ID=your-client-id
-ATLASSIAN_CLIENT_SECRET=your-client-secret
-ATLASSIAN_REDIRECT_URI=http://localhost:3000/callback
-ATLASSIAN_ACCESS_TOKEN=your-access-token
-ATLASSIAN_REFRESH_TOKEN=your-refresh-token
+Use `JiraClient` (or `createJiraClientFromEnv()` factory) for all Jira API calls.
 
-# Option 2: API Token (Simpler setup)
-ATLASSIAN_USER_EMAIL=your-email@company.com
-ATLASSIAN_API_TOKEN=your-api-token
+**Issue CRUD:**
+- `getIssue(key)` -- fetch a single issue by key (e.g., "PROJ-123")
+- `createIssue(input)` -- create an issue; accepts `project` (key string), `issuetype` (name string), `summary`, `description` (ADF document), `priority`, `labels`, `components`, `parent`, `duedate`, `customFields`
+- `updateIssue(key, input)` -- update fields, add/remove labels
+- `deleteIssue(key)` -- delete an issue
+- `assignIssue(key, accountId)` -- assign to a user (pass `null` to unassign)
 
-# Optional: Session Capture
-SESSION_CAPTURE_ENABLED=true
-SESSION_CAPTURE_MODE=full
-SESSION_AUTO_ARCHIVE=false
-```
+**Search with JQL:**
+- `searchIssues({ jql, fields, maxResults })` -- search using JQL
+- Build JQL with the fluent `JqlBuilder` via `jql()`:
+  ```ts
+  import { jql, JqlFunctions } from '@hidden-leaf/atlassian-skill';
+  const query = jql()
+    .equals('project', 'PROJ')
+    .in('status', ['To Do', 'In Progress'])
+    .equals('assignee', JqlFunctions.currentUser())
+    .orderBy('priority', 'DESC')
+    .build();
+  ```
+- Use `JqlTemplates` for common queries: `myOpenIssues(project?)`, `recentlyUpdated(days?, project?)`, `openBugs(project, priorities?)`, `currentSprint(project?)`, `unassigned(project)`, `dueSoon(days?, project?)`, `overdue(project?)`, `createdToday(project?)`, `blocked(project?)`
 
-### Getting Your Cloud ID
+**Transitions and Comments:**
+- `getTransitions(key)` -- list available transitions for an issue
+- `transitionIssue(key, { transitionId, comment?, fields? })` -- move issue to new status
+- `addComment(key, input)` -- add a comment (body in ADF format)
+- `getComments(key)` -- list comments
 
-1. Go to your Atlassian site (e.g., `https://your-domain.atlassian.net`)
-2. Open browser developer tools (F12)
-3. Run: `window._siteConfig?.cloudId` or check the URL in API requests
+**Labels:**
+- `addLabels(key, labels)` -- append labels
+- `removeLabels(key, labels)` -- remove specific labels
+- `setLabels(key, labels)` -- replace all labels
 
-### Creating an API Token
+**Sprints and Boards (Agile):**
+- `listBoards({ projectKeyOrId?, type? })` -- list boards
+- `getBoard(boardId)` -- get board details
+- `listSprints(boardId, { state? })` -- list sprints (state: 'future' | 'active' | 'closed')
+- `getSprint(sprintId)` -- get sprint details
+- `getSprintIssues(sprintId)` -- get issues in a sprint
+- `moveIssuesToSprint(sprintId, issueKeys)` -- move issues into a sprint
 
-1. Go to https://id.atlassian.com/manage-profile/security/api-tokens
-2. Click "Create API token"
-3. Give it a name and copy the token
+**Users:**
+- `getCurrentUser()` -- get the authenticated user
+- `searchUsers(query)` -- search users
+- `getAssignableUsers(projectKey)` -- get users assignable in a project
 
-## Usage Examples
+### ADF Document Builder
 
-### Search Jira Issues
+Use `AdfBuilder` (or `adf()` shorthand) to construct Atlassian Document Format for issue descriptions, comments, and Confluence pages:
 
-```typescript
-import { JiraClient, jql, JqlFunctions } from '@hidden-leaf/atlassian-skill';
-
-const client = new JiraClient({ /* config */ });
-
-// Using JQL builder
-const query = jql()
-  .equals('project', 'HLN')
-  .in('status', ['To Do', 'In Progress'])
-  .equals('assignee', JqlFunctions.currentUser())
-  .orderBy('priority', 'DESC')
-  .build();
-
-const results = await client.searchIssues({ jql: query });
-```
-
-### Create a Jira Issue
-
-```typescript
-import { JiraClient, AdfBuilder } from '@hidden-leaf/atlassian-skill';
-
-const client = new JiraClient({ /* config */ });
-
-const description = new AdfBuilder()
+```ts
+import { AdfBuilder, TextBuilder } from '@hidden-leaf/atlassian-skill';
+const doc = new AdfBuilder()
   .heading(2, 'Problem')
-  .paragraph(p => p.text('Description of the issue...'))
-  .heading(2, 'Steps to Reproduce')
-  .orderedList([
-    [{ text: 'Step 1' }],
-    [{ text: 'Step 2' }],
-  ])
+  .paragraph(p => p.text('Description here...'))
+  .codeBlock('const x = 1;', 'typescript')
+  .bulletList(['Item 1', 'Item 2'])
+  .table(['Header A', 'Header B'], [['cell1', 'cell2']])
+  .panel('info', 'Note: important context')
   .build();
-
-const issue = await client.createIssue({
-  project: 'HLN',
-  issuetype: 'Bug',
-  summary: 'Fix login flow error',
-  description,
-  priority: 'High',
-  labels: ['bug', 'auth'],
-});
 ```
 
-### Capture and Archive Session
+Utility functions: `textToAdf(string)`, `markdownToAdf(string)`, `adfToText(adfDoc)`.
 
-```typescript
-import { SessionCapture, SessionArchiver } from '@hidden-leaf/atlassian-skill';
+### Confluence Operations
 
+Use `ConfluenceClient` (or `createConfluenceClientFromEnv()` factory). This client uses the Confluence Cloud API v2.
+
+**Spaces:**
+- `listSpaces(options?)` -- list accessible spaces
+- `getSpace(spaceId)` -- get space by ID
+- `getSpaceByKey(spaceKey)` -- get space by key (e.g., "ENG")
+
+**Pages:**
+- `createPage({ spaceId, title, body, parentId?, representation? })` -- create a page; body can be ADF document or storage-format HTML string
+- `getPage(pageId, { bodyFormat? })` -- get a page
+- `updatePage({ id, title?, body?, version, versionMessage? })` -- update; must pass current version number (the client increments it)
+- `deletePage(pageId)` -- delete a page
+- `getPageChildren(pageId)` -- get child pages
+- `getSpacePages(spaceId, { depth? })` -- list pages in a space
+
+**Search:**
+- `searchByCQL(cql, { limit? })` -- search using Confluence Query Language
+
+**Connection:**
+- `testConnection()` -- verify credentials work
+
+### Bitbucket Operations
+
+Use `BitbucketClient` (or `createBitbucketClient(config)` factory). Supports OAuth access token or username/app-password auth.
+
+**HTTP Methods:**
+- `get<T>(path, params?)`, `post<T>(path, body?)`, `put<T>(path, body?)`, `delete<T>(path)`, `patch<T>(path, body?)`
+- `getDiff(path)` -- get raw diff text
+- `getAllPages<T>(path, options?)` -- auto-paginate through all results
+
+**Common Bitbucket API paths:**
+- Repositories: `/repositories/{workspace}/{repo_slug}`
+- Pull Requests: `/repositories/{workspace}/{repo_slug}/pullrequests`
+- Branches: `/repositories/{workspace}/{repo_slug}/refs/branches`
+- Pipelines: `/repositories/{workspace}/{repo_slug}/pipelines`
+- Deployments: `/repositories/{workspace}/{repo_slug}/deployments`
+
+**Token management:**
+- `setAccessToken(token)` -- update the access token
+- `refreshAccessToken()` -- refresh OAuth token (requires clientId/clientSecret in auth config)
+
+### Branch Naming
+
+Generate and parse branch names following HLN conventions:
+
+- `generateBranchName(issue, options?)` -- generates `{type}/{ISSUE-KEY}-{short-summary}` (e.g., `feature/PROJ-123-add-user-auth`)
+- `generateReleaseBranchName(version)` -- generates `release/v{version}`
+- `generateHotfixBranchName(issue)` -- generates `hotfix/{ISSUE-KEY}-{desc}`
+- `extractIssueKeyFromBranch(branchName)` -- extracts `PROJ-123` from a branch name
+- `parseBranchName(branchName)` -- returns `{ workType, issueKey, description, version, isStandardFormat }`
+- `validateBranchName(branchName)` -- returns `{ valid, errors, warnings }`
+
+### Changelog and PR Description Generation
+
+- `generatePRDescription(options)` -- generate a full PR description from Jira context, session data, and diff analysis
+- `generatePRTitle(issue, template?)` -- generate a PR title
+- `generateQuickPRDescription(issue)` -- minimal PR description
+- `generatePRDescriptionFromSession(session, issue?)` -- build description from captured session
+- `analyzeDiff(diff)` -- analyze a diff for summary stats
+- `suggestPRLabels(diff, issue?)` -- suggest labels based on changes
+
+Changelog:
+- `generateChangelog(issues, options?)` -- generate changelog from Jira issues; formats: `'markdown' | 'confluence' | 'plain' | 'html'`
+
+### Sprint Planning (Autonomous)
+
+Use `SprintPlanner` (via `createSprintPlanner(jiraClient, aiPlanner, logger)`) for AI-assisted planning:
+
+- `analyzeVelocity(boardId, sprintCount?)` -- analyze velocity trends over recent sprints; returns average, median, trend, predicted next velocity
+- `suggestSprintScope(boardId, capacity)` -- recommend which backlog issues to pull into a sprint given team capacity
+- `identifyRisks(sprintId)` -- identify risks in a sprint (blocked issues, missing estimates, unassigned work, dependency risks)
+- `estimateIssue(issueKey)` -- suggest story points based on similar completed issues
+- `generateSprintGoal(issues)` -- generate a sprint goal from planned issues
+
+### Issue Triage (Autonomous)
+
+Use `IssueTriage` (via `createIssueTriage(jiraClient, aiAnalyzer, logger)`) for intelligent issue routing:
+
+- `triageIssue(issueKey)` -- full triage: classify, find similar issues, detect duplicates, suggest assignee, generate recommendations
+- `findSimilarIssues(issueKey)` -- find similar issues by content analysis
+- `suggestAssignee(issueKey)` -- suggest best assignee based on expertise and workload
+- `detectDuplicates(issueKey)` -- detect potential duplicate issues
+
+Triage can operate in `SUGGEST` mode (adds a comment with recommendations) or `AUTO` mode (applies changes above confidence threshold).
+
+### Session Capture and Archiving
+
+**Capture** session events with `SessionCapture` (or `createSessionCaptureFromEnv()`):
+
+```ts
 const capture = new SessionCapture();
 capture.startSession({ projectName: 'My Project' });
-
-// ... during session ...
-capture.captureUserMessage('Help me fix the auth bug');
-capture.captureToolUse('Read', 'tool-123', { file_path: '/src/auth.ts' });
+capture.captureUserMessage('Fix the auth bug');
+capture.captureToolUse('Read', 'tool-id', { file_path: '/src/auth.ts' });
 capture.captureFileOperation('edit', '/src/auth.ts', true, 15);
+capture.captureCommand('npm test', 0, 'All tests pass');
+const transcript = capture.endSession('Fixed auth flow');
+```
 
-// End session
-const transcript = capture.endSession('Fixed authentication flow');
+**Archive** transcripts with `SessionArchiver` (or `createArchiverFromEnv()`):
 
-// Archive to Confluence
-const archiver = new SessionArchiver();
-await archiver.archive(transcript, {
-  destination: 'confluence',
+```ts
+const archiver = new SessionArchiver({ confluenceClient, jiraClient });
+const result = await archiver.archive(transcript, {
+  destination: 'confluence',  // or 'jira' or 'both'
   confluenceSpaceKey: 'ENG',
   format: 'full',
   includeFullTranscript: true,
 });
 ```
 
-## Available Commands
+## Usage Patterns
 
-When this skill is active, you can ask Claude Code to:
+### "Create a ticket for this"
+1. Extract context from the conversation (summary, description, type, priority).
+2. Build an ADF description using `AdfBuilder`.
+3. Call `jiraClient.createIssue({ project: 'PROJ', issuetype: 'Task', summary, description })`.
+4. Return the issue key and URL to the user.
 
-### Jira Operations
-- "Show me my open tickets in project HLN"
-- "Create a bug ticket for the login error"
-- "Move HLN-123 to In Progress"
-- "Add a comment to HLN-456"
-- "What's in the current sprint?"
-- "Find all high priority bugs assigned to me"
+### "Plan this as an epic with subtasks"
+1. Parse the user's plan into an epic summary and child task summaries.
+2. Create the epic: `jiraClient.createIssue({ project, issuetype: 'Epic', summary })`.
+3. Create each child task with `parent` set to the epic key.
+4. Return all created issue keys.
 
-### Confluence Operations
-- "Create a design doc for the new feature"
-- "Update the README sync in Confluence"
-- "Archive this session to the Engineering space"
+### "Move PROJ-123 to In Progress"
+1. Call `jiraClient.getTransitions('PROJ-123')` to find the transition ID for "In Progress".
+2. Call `jiraClient.transitionIssue('PROJ-123', { transitionId })`.
+3. Confirm the transition to the user.
 
-### Bitbucket Operations
-- "Create a PR for this branch"
-- "Link this PR to HLN-123"
-- "Check the pipeline status"
+### "What's in the current sprint?"
+1. Find the board: `jiraClient.listBoards({ projectKeyOrId: 'PROJ' })`.
+2. Get active sprints: `jiraClient.listSprints(boardId, { state: 'active' })`.
+3. Get sprint issues: `jiraClient.getSprintIssues(sprintId)`.
+4. Format and present the results (key, summary, status, assignee, story points).
 
-### Orchestration
-- "Generate a branch name for HLN-123"
-- "Create a changelog from recent commits"
-- "Generate a PR description"
+### "Search for bugs assigned to me"
+1. Build JQL: `jql().equals('project', 'PROJ').equals('issuetype', 'Bug').equals('assignee', JqlFunctions.currentUser()).orderBy('priority', 'DESC').build()`.
+2. Execute: `jiraClient.searchIssues({ jql: query })`.
+3. Present results.
+
+### "Create a PR for this branch"
+1. Get the current branch name and extract the issue key with `extractIssueKeyFromBranch()`.
+2. Fetch the Jira issue for context: `jiraClient.getIssue(issueKey)`.
+3. Generate PR title: `generatePRTitle(issue)`.
+4. Generate PR description: `generatePRDescription({ issue, template: 'standard' })`.
+5. Use `BitbucketClient` to create the PR, or output the title/description for the user to use with `gh pr create`.
+
+### "Generate a branch name for PROJ-123"
+1. Fetch the issue: `jiraClient.getIssue('PROJ-123')`.
+2. Generate: `generateBranchName(issue)`.
+3. Return the branch name (e.g., `feature/PROJ-123-add-user-authentication`).
+
+### "Create a Confluence page documenting this"
+1. Get the space: `confluenceClient.getSpaceByKey('ENG')`.
+2. Build content with `AdfBuilder` or pass HTML in storage format.
+3. Create the page: `confluenceClient.createPage({ spaceId: space.id, title, body })`.
+4. Return the page URL.
+
+### "Archive this session"
+1. End the session capture: `const transcript = capture.endSession('Summary of work')`.
+2. Archive: `archiver.archive(transcript, { destination: 'confluence', confluenceSpaceKey: 'ENG', format: 'full' })`.
+3. Return the Confluence page URL or Jira issue key.
+
+### "Analyze sprint risks"
+1. Find the active sprint via `listSprints(boardId, { state: 'active' })`.
+2. Run `sprintPlanner.identifyRisks(sprintId)`.
+3. Present risk factors, affected issues, and recommendations.
+
+### "Triage this new issue"
+1. Run `issueTriage.triageIssue('PROJ-456')`.
+2. Present recommendations (priority, type, labels, assignee, potential duplicates).
+3. If in auto mode, confirm what was applied.
+
+## Error Handling
+
+- **AuthenticationError** (401): Check API token or OAuth credentials. Verify `ATLASSIAN_CLOUD_ID` matches the site.
+- **AuthorizationError** (403): The user lacks permission for the operation. Check Jira/Confluence project permissions.
+- **NotFoundError** (404): Verify the issue key, page ID, or project key exists and is accessible.
+- **RateLimitError** (429): The client handles rate limiting automatically with exponential backoff. If persistent, reduce concurrent operations.
+- **ValidationError** (400): Check field values -- common causes are invalid issue type names, missing required fields, or malformed ADF.
+
+All error classes are exported from the package: `AtlassianApiError`, `AuthenticationError`, `AuthorizationError`, `NotFoundError`, `RateLimitError`, `ValidationError`.
 
 ## HLN Label Conventions
 
-This skill enforces Hidden Leaf Network labeling standards:
-
-| Category | Labels |
-|----------|--------|
-| Team | `frontend`, `backend`, `devops`, `qa`, `design` |
-| Type | `feature`, `bug`, `tech-debt`, `spike`, `doc` |
-| Status | `blocked`, `needs-review`, `in-progress`, `ready` |
-| Priority | `p0-critical`, `p1-high`, `p2-medium`, `p3-low` |
-| Component | `api`, `ui`, `db`, `auth`, `infra` |
-
-## API Reference
-
-### JiraClient
-
-| Method | Description |
-|--------|-------------|
-| `getIssue(key)` | Get issue by key |
-| `searchIssues(options)` | Search with JQL |
-| `createIssue(input)` | Create new issue |
-| `updateIssue(key, input)` | Update issue |
-| `transitionIssue(key, input)` | Change issue status |
-| `addComment(key, input)` | Add comment |
-| `addLabels(key, labels)` | Add labels |
-| `getSprint(id)` | Get sprint details |
-| `getSprintIssues(id)` | Get issues in sprint |
-
-### JQL Builder
-
-```typescript
-jql()
-  .equals(field, value)      // field = value
-  .notEquals(field, value)   // field != value
-  .in(field, values)         // field IN (values)
-  .contains(field, text)     // field ~ "text"
-  .greaterThan(field, value) // field > value
-  .is(field, 'EMPTY')        // field IS EMPTY
-  .orderBy(field, 'DESC')    // ORDER BY field DESC
-  .build()                   // Returns JQL string
-```
-
-### ADF Builder
-
-```typescript
-adf()
-  .heading(level, text)      // Add heading
-  .paragraph(builder)        // Add paragraph
-  .bulletList(items)         // Add bullet list
-  .orderedList(items)        // Add numbered list
-  .codeBlock(code, lang)     // Add code block
-  .table(rows)               // Add table
-  .panel(type, builder)      // Add info/warning panel
-  .build()                   // Returns ADF document
-```
-
-## Security
-
-- Never commit `.env` files or credentials
-- Use OAuth for production deployments
-- API tokens are scoped to your user permissions
-- Session transcripts may contain sensitive data - use redaction patterns
-
-## Troubleshooting
-
-### "Authentication failed"
-- Check your API token or OAuth credentials
-- Verify the Cloud ID matches your site
-- Ensure your user has necessary permissions
-
-### "Rate limit exceeded"
-- The skill includes automatic rate limiting
-- Reduce concurrent operations if hitting limits
-- Consider caching frequently accessed data
-
-### "Issue not found"
-- Verify the issue key format (PROJECT-123)
-- Check you have permission to view the issue
-- Ensure the project exists
-
-## Contributing
-
-See the main repository for contribution guidelines.
-
-## License
-
-MIT - Hidden Leaf Network
+| Category  | Labels                                                   |
+|-----------|----------------------------------------------------------|
+| Team      | `frontend`, `backend`, `devops`, `qa`, `design`         |
+| Type      | `feature`, `bug`, `tech-debt`, `spike`, `doc`            |
+| Status    | `blocked`, `needs-review`, `in-progress`, `ready`        |
+| Priority  | `p0-critical`, `p1-high`, `p2-medium`, `p3-low`         |
+| Component | `api`, `ui`, `db`, `auth`, `infra`                       |

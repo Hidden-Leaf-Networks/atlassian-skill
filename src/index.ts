@@ -289,6 +289,7 @@ export {
 
 export * from './orchestration/branch-naming.js';
 export * from './orchestration/changelog-generator.js';
+export * from './orchestration/plan-executor.js';
 
 export {
   type PRTemplateType,
@@ -303,6 +304,8 @@ export {
   generatePRDescriptionFromSession,
   generateQuickPRDescription,
 } from './orchestration/pr-description-generator.js';
+
+export * from './orchestration/session-bridge.js';
 
 // ============================================================================
 // Autonomous Exports
@@ -389,4 +392,4 @@ export * from './utils/validators.js';
 // Version
 // ============================================================================
 
-export const VERSION = '1.0.0';
+export const VERSION = '0.5.5';
