@@ -4,22 +4,43 @@
   "description": "Unified Atlassian Claude Code Skill for Jira and Confluence integration",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./SKILL.md": "./SKILL.md"
+  },
+  "files": [
+    "dist",
+    "SKILL.md",
+    ".env.example"
+  ],
   "scripts": {
     "build": "tsc",
     "watch": "tsc --watch",
     "lint": "eslint 'src/**/*.ts'",
     "test": "jest --passWithNoTests",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "prepublishOnly": "npm run build"
   },
   "keywords": [
     "atlassian",
     "jira",
     "confluence",
+    "bitbucket",
     "claude-code",
-    "skill"
+    "skill",
+    "ai-sdlc"
   ],
-  "author": "Hidden Leaf Network",
+  "author": "Hidden Leaf Networks",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Hidden-Leaf-Networks/atlassian-skill.git"
+  },
+  "homepage": "https://github.com/Hidden-Leaf-Networks/atlassian-skill#readme",
   "dependencies": {
     "axios": "^1.6.0",
     "axios-retry": "^4.0.0",

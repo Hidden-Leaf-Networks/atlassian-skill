@@ -15,3 +15,4 @@ coverage/
 smoke-test.ts
 test-plan-executor.ts
 sync-board.ts
+update-bug.ts
