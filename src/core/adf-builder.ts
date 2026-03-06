@@ -3,7 +3,7 @@
  * Fluent API for constructing ADF documents for Jira and Confluence
  */
 
-import { AdfDocument, AdfNode, AdfMark, AdfMarkType, AdfNodeType } from './types.js';
+import { AdfDocument, AdfNode, AdfMark, AdfMarkType } from './types.js';
 
 // ============================================================================
 // ADF Builder Class

@@ -206,6 +206,13 @@ export function createLoggerFromEnv(context?: string): Logger {
 }
 
 /**
+ * Create a logger with a given context
+ */
+export function createLogger(context: string): Logger {
+  return new Logger({ context });
+}
+
+/**
  * Default logger instance
  */
 export const logger = createLoggerFromEnv('atlassian-skill');

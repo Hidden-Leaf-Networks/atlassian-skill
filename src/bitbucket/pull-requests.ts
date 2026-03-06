@@ -422,7 +422,7 @@ export class PullRequestOperations {
     repoSlug: string,
     prId: number
   ): Promise<MergeStrategy[]> {
-    const pr = await this.getPullRequest(workspace, repoSlug, prId);
+    await this.getPullRequest(workspace, repoSlug, prId);
 
     // Default strategies if not specified in destination branch
     const defaultStrategies: MergeStrategy[] = [

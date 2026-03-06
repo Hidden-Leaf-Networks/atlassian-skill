@@ -75,7 +75,6 @@ const DEFAULT_CONFIG = {
 export class ConfluenceClient {
   private readonly cloudId: string;
   private accessToken: string;
-  private readonly refreshToken?: string;
   private readonly baseUrl: string;
   private readonly timeout: number;
   private readonly maxRetries: number;
@@ -95,7 +94,6 @@ export class ConfluenceClient {
 
     this.cloudId = config.cloudId;
     this.accessToken = config.accessToken;
-    this.refreshToken = config.refreshToken;
     this.baseUrl = config.baseUrl ?? DEFAULT_CONFIG.baseUrl;
     this.timeout = config.timeout ?? DEFAULT_CONFIG.timeout;
     this.maxRetries = config.maxRetries ?? DEFAULT_CONFIG.maxRetries;
@@ -539,10 +537,10 @@ export class ConfluenceClient {
       throw new Error(`Search failed: ${response.statusText}`);
     }
 
-    const data = await response.json();
+    const data = await response.json() as Record<string, unknown>;
     return {
-      results: data.results ?? [],
-      _links: data._links,
+      results: (data.results as SearchResult['results']) ?? [],
+      _links: data._links as SearchResult['_links'],
     };
   }
 

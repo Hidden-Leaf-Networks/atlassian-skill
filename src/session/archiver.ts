@@ -4,7 +4,7 @@
  */
 
 import { createLoggerFromEnv, Logger } from '../utils/logger.js';
-import { AdfBuilder } from '../core/adf-builder.js';
+import { AdfBuilder, TextBuilder } from '../core/adf-builder.js';
 import {
   SessionTranscript,
   SessionMetadata,
@@ -27,8 +27,10 @@ import {
  */
 export class SessionArchiver {
   private readonly logger: Logger;
-  private confluenceClient?: unknown; // Will be typed when imported
-  private jiraClient?: unknown;
+  /** Confluence client - will be typed when integrated */
+  confluenceClient?: unknown;
+  /** Jira client - will be typed when integrated */
+  jiraClient?: unknown;
 
   constructor(options?: {
     confluenceClient?: unknown;
@@ -87,10 +89,10 @@ export class SessionArchiver {
       }
 
       result.success = true;
-      this.logger.info('Session archived successfully', result);
+      this.logger.info('Session archived successfully', { ...result });
     } catch (error) {
       result.error = error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error('Failed to archive session', { error: result.error });
+      this.logger.error('Failed to archive session', error instanceof Error ? error : undefined, { error: result.error });
     }
 
     return result;
@@ -105,7 +107,7 @@ export class SessionArchiver {
     config: ArchiveConfig
   ): Promise<{ pageId: string; pageUrl: string }> {
     const pageTitle = this.generatePageTitle(transcript.metadata, summary);
-    const pageContent = this.buildConfluenceContent(transcript, summary, config);
+    this.buildConfluenceContent(transcript, summary, config);
 
     // TODO: Use actual Confluence client when integrated
     this.logger.info('Would create Confluence page', {
@@ -158,89 +160,75 @@ export class SessionArchiver {
     adf.heading(1, `Session: ${summary.title}`);
 
     // Metadata panel
-    adf.panel('info', panel => {
-      panel.paragraph(p => {
-        p.text('Session ID: ').bold(transcript.metadata.sessionId);
-      });
-      panel.paragraph(p => {
-        p.text('Started: ').text(transcript.metadata.startedAt);
-      });
-      if (transcript.metadata.endedAt) {
-        panel.paragraph(p => {
-          p.text('Ended: ').text(transcript.metadata.endedAt!);
-        });
-      }
-      if (transcript.metadata.git) {
-        panel.paragraph(p => {
-          p.text('Branch: ').code(transcript.metadata.git!.branch);
-          p.text(' @ ').code(transcript.metadata.git!.commit);
-        });
-      }
-    });
+    const metaParts = new TextBuilder()
+      .text('Session ID: ').bold(transcript.metadata.sessionId)
+      .text(' | Started: ').text(transcript.metadata.startedAt);
+    if (transcript.metadata.endedAt) {
+      metaParts.text(' | Ended: ').text(transcript.metadata.endedAt);
+    }
+    if (transcript.metadata.git) {
+      metaParts.text(' | Branch: ').code(transcript.metadata.git.branch)
+        .text(' @ ').code(transcript.metadata.git.commit);
+    }
+    adf.panel('info', metaParts);
 
     // Summary section
     adf.heading(2, 'Summary');
 
     if (summary.accomplishments.length > 0) {
       adf.heading(3, 'Accomplishments');
-      adf.bulletList(summary.accomplishments.map(a => [{ text: a }]));
+      adf.bulletList(summary.accomplishments);
     }
 
     if (summary.filesChanged.length > 0) {
       adf.heading(3, 'Files Changed');
-      adf.bulletList(summary.filesChanged.map(f => [{ text: f, marks: ['code'] }]));
+      adf.bulletList(summary.filesChanged.map(f => new TextBuilder().code(f).build()));
     }
 
     if (summary.decisions.length > 0) {
       adf.heading(3, 'Key Decisions');
-      adf.bulletList(summary.decisions.map(d => [{ text: d }]));
+      adf.bulletList(summary.decisions);
     }
 
     if (summary.issues.length > 0) {
       adf.heading(3, 'Issues Encountered');
-      adf.panel('warning', panel => {
-        for (const issue of summary.issues) {
-          panel.paragraph(p => p.text(issue));
-        }
-      });
+      adf.panel('warning', summary.issues.join('; '));
     }
 
     if (summary.nextSteps.length > 0) {
       adf.heading(3, 'Next Steps');
-      adf.orderedList(summary.nextSteps.map(s => [{ text: s }]));
+      adf.orderedList(summary.nextSteps);
     }
 
     // Statistics
     adf.heading(2, 'Statistics');
-    adf.table([
+    adf.table(
       ['Metric', 'Value'],
-      ['Duration', this.formatDuration(transcript.metadata.stats.totalDuration)],
-      ['Messages', transcript.metadata.stats.messageCount.toString()],
-      ['Tool Calls', transcript.metadata.stats.toolCallCount.toString()],
-      ['Files Read', transcript.metadata.stats.filesRead.toString()],
-      ['Files Written', transcript.metadata.stats.filesWritten.toString()],
-      ['Files Edited', transcript.metadata.stats.filesEdited.toString()],
-      ['Commands Run', transcript.metadata.stats.commandsRun.toString()],
-      ['Errors', transcript.metadata.stats.errorsEncountered.toString()],
-    ]);
+      [
+        ['Duration', this.formatDuration(transcript.metadata.stats.totalDuration)],
+        ['Messages', transcript.metadata.stats.messageCount.toString()],
+        ['Tool Calls', transcript.metadata.stats.toolCallCount.toString()],
+        ['Files Read', transcript.metadata.stats.filesRead.toString()],
+        ['Files Written', transcript.metadata.stats.filesWritten.toString()],
+        ['Files Edited', transcript.metadata.stats.filesEdited.toString()],
+        ['Commands Run', transcript.metadata.stats.commandsRun.toString()],
+        ['Errors', transcript.metadata.stats.errorsEncountered.toString()],
+      ]
+    );
 
     // Full transcript (if requested)
     if (config.includeFullTranscript && config.format === 'full') {
       adf.heading(2, 'Full Transcript');
-      adf.expand('Click to expand transcript', expand => {
-        for (const event of transcript.events) {
-          this.addEventToAdf(expand, event);
-        }
-      });
+      for (const event of transcript.events) {
+        this.addEventToAdf(adf, event);
+      }
     }
 
     // Related issues
     if (transcript.metadata.relatedIssues && transcript.metadata.relatedIssues.length > 0) {
       adf.heading(2, 'Related Issues');
       for (const issueKey of transcript.metadata.relatedIssues) {
-        adf.paragraph(p => {
-          p.jiraIssue(issueKey);
-        });
+        adf.paragraph(new TextBuilder().code(issueKey));
       }
     }
 
@@ -253,30 +241,28 @@ export class SessionArchiver {
   private buildJiraIssue(
     transcript: SessionTranscript,
     summary: TranscriptSummary,
-    config: ArchiveConfig
+    _config: ArchiveConfig
   ): { summary: string; description: unknown } {
     const adf = new AdfBuilder();
 
     adf.heading(2, 'Session Summary');
-    adf.bulletList(summary.accomplishments.map(a => [{ text: a }]));
+    adf.bulletList(summary.accomplishments);
 
     if (summary.filesChanged.length > 0) {
       adf.heading(3, 'Files Changed');
-      adf.bulletList(summary.filesChanged.slice(0, 10).map(f => [{ text: f, marks: ['code'] }]));
+      adf.bulletList(summary.filesChanged.slice(0, 10).map(f => new TextBuilder().code(f).build()));
       if (summary.filesChanged.length > 10) {
-        adf.paragraph(p => p.text(`...and ${summary.filesChanged.length - 10} more files`));
+        adf.paragraph(`...and ${summary.filesChanged.length - 10} more files`);
       }
     }
 
     if (summary.nextSteps.length > 0) {
       adf.heading(3, 'Next Steps');
-      adf.orderedList(summary.nextSteps.map(s => [{ text: s }]));
+      adf.orderedList(summary.nextSteps);
     }
 
     // Link to Confluence page if created
-    adf.paragraph(p => {
-      p.text('Session ID: ').code(transcript.metadata.sessionId);
-    });
+    adf.paragraph(new TextBuilder().text('Session ID: ').code(transcript.metadata.sessionId));
 
     return {
       summary: `[Session Archive] ${summary.title}`,
@@ -293,37 +279,30 @@ export class SessionArchiver {
     switch (event.type) {
       case 'user_message': {
         const data = event.data as MessageData;
-        builder.panel('note', panel => {
-          panel.paragraph(p => p.bold(`[${timestamp}] User:`));
-          panel.paragraph(p => p.text(data.content));
-        });
+        builder.panel('note', new TextBuilder().bold(`[${timestamp}] User: `).text(data.content));
         break;
       }
 
       case 'assistant_message': {
         const data = event.data as MessageData;
-        builder.paragraph(p => p.bold(`[${timestamp}] Assistant:`));
-        builder.paragraph(p => p.text(data.content.slice(0, 2000)));
+        builder.paragraph(new TextBuilder().bold(`[${timestamp}] Assistant:`));
+        builder.paragraph(data.content.slice(0, 2000));
         if (data.content.length > 2000) {
-          builder.paragraph(p => p.text('...[truncated]').italic());
+          builder.paragraph(new TextBuilder().italic('...[truncated]'));
         }
         break;
       }
 
       case 'tool_use': {
         const data = event.data as ToolUseData;
-        builder.paragraph(p => {
-          p.text(`[${timestamp}] `).code(data.toolName);
-        });
+        builder.paragraph(new TextBuilder().text(`[${timestamp}] `).code(data.toolName));
         break;
       }
 
       case 'file_write':
       case 'file_edit': {
         const data = event.data as FileOperationData;
-        builder.paragraph(p => {
-          p.text(`[${timestamp}] ${data.operation}: `).code(data.path);
-        });
+        builder.paragraph(new TextBuilder().text(`[${timestamp}] ${data.operation}: `).code(data.path));
         break;
       }
 

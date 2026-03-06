@@ -480,7 +480,7 @@ export const JqlTemplates = {
   /**
    * Sprint backlog
    */
-  sprintBacklog: (sprintId: number | string): string => {
+  sprintBacklog: (_sprintId: number | string): string => {
     return jql()
       .in('sprint', JqlFunctions.openSprints())
       .notEquals('status', 'Done')

@@ -9,15 +9,11 @@ import * as path from 'node:path';
 import { ConfluenceClient } from './client.js';
 import { PageService } from './pages.js';
 import type {
-  Page,
   ADFDocument,
   ADFNode,
-  ADFMark,
-  ADFNodeType,
   SyncOptions,
   SyncResult,
   PageSyncInfo,
-  SyncError,
 } from './types.js';
 
 // ============================================================================
@@ -407,7 +403,6 @@ const DEFAULT_SYNC_OPTIONS: Required<SyncOptions> = {
  * ```
  */
 export class DocumentationSyncService {
-  private readonly client: ConfluenceClient;
   private readonly pageService: PageService;
   private readonly converter: MarkdownToADFConverter;
 
@@ -416,7 +411,6 @@ export class DocumentationSyncService {
    * @param client - Confluence client instance
    */
   constructor(client: ConfluenceClient) {
-    this.client = client;
     this.pageService = new PageService(client);
     this.converter = new MarkdownToADFConverter();
   }

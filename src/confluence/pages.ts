@@ -9,7 +9,6 @@ import type {
   Page,
   ADFDocument,
   SearchResult,
-  PaginatedResponse,
   GetPageOptions,
   BodyRepresentationType,
   PageVersion,
@@ -374,7 +373,7 @@ export class PageService {
    * @param versionNumber - Version number to retrieve
    * @returns Page at specified version
    */
-  async getPageVersion(pageId: string, versionNumber: number): Promise<Page> {
+  async getPageVersion(pageId: string, _versionNumber: number): Promise<Page> {
     // Note: API v2 may handle this differently
     // This is a simplified implementation
     return this.client.getPage(pageId);
@@ -464,7 +463,7 @@ export class PageService {
    */
   async movePage(
     pageId: string,
-    newParentId: string,
+    _newParentId: string,
     versionMessage?: string
   ): Promise<Page> {
     const page = await this.getPage(pageId, { includeVersion: true });

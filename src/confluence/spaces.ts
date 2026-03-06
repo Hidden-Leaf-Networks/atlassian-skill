@@ -10,8 +10,6 @@ import type {
   Page,
   SpaceType,
   SpaceStatus,
-  PaginatedResponse,
-  ListSpacesOptions,
 } from './types.js';
 
 // ============================================================================

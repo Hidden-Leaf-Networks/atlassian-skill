@@ -408,7 +408,7 @@ export class BitbucketClient {
     let isFirstRequest = true;
 
     while (nextUrl) {
-      const response = await this.get<PaginatedResponse<T>>(
+      const response: PaginatedResponse<T> = await this.get<PaginatedResponse<T>>(
         nextUrl,
         isFirstRequest ? params : undefined
       );

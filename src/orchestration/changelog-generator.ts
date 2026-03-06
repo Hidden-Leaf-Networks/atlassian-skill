@@ -6,7 +6,7 @@
  * Confluence pages, and standalone markdown files.
  */
 
-import { JiraIssue, JiraVersion, WorkType, ISSUE_TYPE_TO_WORK_TYPE } from './types';
+import { JiraIssue, JiraVersion } from './types';
 
 // ============================================================================
 // Types

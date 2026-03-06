@@ -4,7 +4,7 @@
  */
 
 import { AtlassianClient, createClientFromEnv } from '../core/client.js';
-import { AtlassianClientConfig, AdfDocument, PaginationOptions } from '../core/types.js';
+import { AtlassianClientConfig, PaginationOptions } from '../core/types.js';
 import {
   JiraIssue,
   JiraProject,

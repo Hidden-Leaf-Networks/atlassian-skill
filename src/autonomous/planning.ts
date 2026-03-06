@@ -522,7 +522,7 @@ export class SprintPlanner {
     let addedPoints = 0;
     let removedPoints = 0;
 
-    const committedIssues = issues.filter(i => {
+    const committedIssues = issues.filter(_i => {
       // Issues that were in the sprint at the start
       // This is a simplification - real implementation would check sprint history
       return true;
@@ -560,7 +560,7 @@ export class SprintPlanner {
 
   private async scoreIssuesForSprint(
     issues: JiraIssue[],
-    velocityAnalysis: VelocityAnalysis
+    _velocityAnalysis: VelocityAnalysis
   ): Promise<IssueSuggestion[]> {
     const scoredIssues: IssueSuggestion[] = [];
 
@@ -669,7 +669,7 @@ export class SprintPlanner {
 
     // Check priority distribution
     const priorities = issues.map(i => i.priority);
-    const highPriorityRatio = priorities.filter(p => p === 'High' || p === 'Highest').length / priorities.length;
+    const highPriorityRatio = priorities.filter(p => p === Priority.HIGH || p === Priority.HIGHEST).length / priorities.length;
 
     if (highPriorityRatio > 0.8) {
       score -= 10; // Too many high priority items
@@ -818,7 +818,7 @@ export class SprintPlanner {
 
   private predictNextVelocity(
     velocities: number[],
-    trend: 'increasing' | 'stable' | 'decreasing',
+    _trend: 'increasing' | 'stable' | 'decreasing',
     trendPercentage: number
   ): number {
     const avg = this.calculateAverage(velocities);

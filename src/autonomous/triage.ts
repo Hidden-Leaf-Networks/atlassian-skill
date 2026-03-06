@@ -553,7 +553,7 @@ export class IssueTriage {
     projectKey: string,
     issueComponents: string[],
     issueLabels: string[],
-    issueType: string
+    _issueType: string
   ): Promise<{
     score: number;
     reasons: string[];

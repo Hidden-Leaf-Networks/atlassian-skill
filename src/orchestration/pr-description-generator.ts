@@ -11,10 +11,8 @@
 import {
   JiraIssue,
   SessionContext,
-  WorkflowConfig,
-  DEFAULT_WORKFLOW_CONFIG,
 } from './types';
-import { categorizeIssue, IssueCategory } from './changelog-generator';
+import { categorizeIssue } from './changelog-generator';
 
 // ============================================================================
 // Types
@@ -385,7 +383,7 @@ function generateDetailedBody(
 function generateReleaseBody(
   issue: JiraIssue,
   diffAnalysis: DiffAnalysis | null,
-  opts: Required<PRDescriptionOptions>
+  _opts: Required<PRDescriptionOptions>
 ): string {
   const sections: string[] = [];
 
