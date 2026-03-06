@@ -293,6 +293,7 @@ export * from './orchestration/changelog-generator.js';
 export * from './orchestration/plan-executor.js';
 export * from './orchestration/board-sync.js';
 export * from './orchestration/workflow-manager.js';
+export * from './orchestration/project-reset.js';
 
 export {
   type PRTemplateType,

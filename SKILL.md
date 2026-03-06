@@ -182,6 +182,31 @@ Available presets:
 - `simple-kanban` -- Default Kanban: Backlog -> Selected for Development -> In Progress -> Done
 - `dev-review` -- Dev + Review: Todo -> In Progress -> In Review -> Done
 
+### Project Management
+
+Use `ProjectReset` (or `createProjectReset(jiraClient)`) for project lifecycle operations. Designed to work around Jira Cloud API limitations (workflow locks, managed schemes).
+
+**Snapshot:**
+- `snapshot(projectKey, options?)` -- capture all issues with hierarchy, labels, descriptions, and optionally comments. Non-destructive.
+
+**Reset:**
+- `reset(projectKey, options?)` -- full reset: snapshot -> delete -> recreate -> apply workflow preset -> restore all issues with hierarchy and statuses
+  - `workflowPreset?` -- apply a workflow preset after recreation (e.g., `'hln-sdlc'`)
+  - `restoreComments?` -- restore issue comments (default: false)
+  - `restoreStatuses?` -- transition issues to original status (default: true)
+  - `onProgress?` -- callback for progress updates
+  - Returns `ResetResult` with key mapping (old key -> new key), errors, and summary
+
+**JiraClient project operations:**
+- `jiraClient.createProject(input)` -- create a project; accepts `key`, `name`, `projectTypeKey`, `projectTemplateKey`, `leadAccountId`
+- `jiraClient.deleteProject(key, { enableUndo? })` -- delete a project (set `enableUndo: false` for permanent deletion)
+
+**Known Jira Cloud API limitations (documented in ATLSK-62):**
+- `POST /workflows/update` may return 409 "workflow lock" tenant-wide -- no API mechanism to clear it
+- `POST /workflows/create` has an undocumented `links` format -- workflow creation via API is currently impossible
+- Simplified workflow schemes (auto-created by Jira) cannot have drafts or be reassigned to non-empty projects
+- `ProjectReset` works around these by deleting and recreating the entire project
+
 ### Sprint Planning (Autonomous)
 
 Use `SprintPlanner` (via `createSprintPlanner(jiraClient, aiPlanner, logger)`) for AI-assisted planning:
@@ -309,6 +334,17 @@ const result = await archiver.archive(transcript, {
 4. Present the result summary (created statuses, workflow status, board columns).
 5. For BoardSync integration, get the label mapping: `wfm.getPresetLabelMapping('hln-sdlc')`.
 
+### "Reset this project" / "The board is broken, fix it"
+1. Create the resetter: `const resetter = createProjectReset(jiraClient)`.
+2. Run reset: `const result = await resetter.reset('PROJ', { workflowPreset: 'hln-sdlc', restoreComments: true })`.
+3. Present the result summary and key mapping.
+4. If `result.workflowApplied` is false, inform the user that board columns need manual configuration via Jira UI.
+
+### "Snapshot this project before changes"
+1. Create the resetter: `const resetter = createProjectReset(jiraClient)`.
+2. Capture: `const snapshot = await resetter.snapshot('PROJ', { includeComments: true })`.
+3. Store or return the snapshot data (JSON-serializable).
+
 ### "Review code and update the board"
 1. Analyze the codebase to determine what's implemented vs planned.
 2. Use `PlanExecutor` to create new issues for discovered work.
@@ -323,7 +359,9 @@ const result = await archiver.archive(transcript, {
 - **RateLimitError** (429): The client handles rate limiting automatically with exponential backoff. If persistent, reduce concurrent operations.
 - **ValidationError** (400): Check field values -- common causes are invalid issue type names, missing required fields, or malformed ADF.
 
-All error classes are exported from the package: `AtlassianApiError`, `AuthenticationError`, `AuthorizationError`, `NotFoundError`, `RateLimitError`, `ValidationError`.
+- **WorkflowLockError** (409): The Jira Cloud workflow API is locked tenant-wide. Use `ProjectReset` to work around it, or configure board columns manually via Jira UI. See ATLSK-62 for full investigation.
+
+All error classes are exported from the package: `AtlassianApiError`, `AuthenticationError`, `AuthorizationError`, `NotFoundError`, `RateLimitError`, `ValidationError`, `WorkflowLockError`.
 
 ## HLN Label Conventions
 

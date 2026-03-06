@@ -337,6 +337,16 @@ export class JiraClient extends AtlassianClient {
   /**
    * Create a new project
    */
+  /**
+   * Delete a project and all its issues
+   */
+  async deleteProject(projectIdOrKey: string, options?: { enableUndo?: boolean }): Promise<void> {
+    await this.delete(
+      `${this.apiPath}/project/${projectIdOrKey}`,
+      { enableUndo: options?.enableUndo ?? false }
+    );
+  }
+
   async createProject(input: JiraProjectCreateInput): Promise<JiraProject> {
     const response = await this.post<JiraProject>(
       `${this.apiPath}/project`,
