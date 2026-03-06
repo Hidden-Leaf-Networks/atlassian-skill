@@ -10,6 +10,7 @@ Activate this skill when the user:
 - Asks to archive or document a coding session
 - Mentions sprint planning, backlog grooming, velocity, or triage
 - Wants to generate changelogs or PR descriptions from Jira data
+- Asks to sync the board, update issue statuses, or review project status
 - Asks to create or update Confluence pages
 
 ## Setup
@@ -262,6 +263,22 @@ const result = await archiver.archive(transcript, {
 1. Run `issueTriage.triageIssue('PROJ-456')`.
 2. Present recommendations (priority, type, labels, assignee, potential duplicates).
 3. If in auto mode, confirm what was applied.
+
+### "Sync the board" / "Update issue statuses"
+1. Use `createBoardSync(jiraClient, 'PROJ')` — auto-detects board transitions.
+2. Call `boardSync.sync()` — transitions issues based on labels:
+   - `done` label -> Done column
+   - `next` label -> Selected for Development
+   - `in-progress` label -> In Progress
+   - `future` label -> stays in Backlog
+3. Returns summary with counts of transitioned/skipped/errored issues.
+4. Custom label-to-status mappings can be passed via config.
+
+### "Review code and update the board"
+1. Analyze the codebase to determine what's implemented vs planned.
+2. Use `PlanExecutor` to create new issues for discovered work.
+3. Use `BoardSync` to transition existing issues to correct statuses.
+4. Report what was updated.
 
 ## Error Handling
 

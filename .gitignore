@@ -14,3 +14,4 @@ coverage/
 *.swo
 smoke-test.ts
 test-plan-executor.ts
+sync-board.ts
