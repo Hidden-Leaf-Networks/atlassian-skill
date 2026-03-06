@@ -211,12 +211,17 @@ export class AtlassianClient {
       return path;
     }
 
-    // For Cloud API v3, use the new base URL structure
+    // API token auth goes directly to the site URL
+    // OAuth auth routes through the Cloud API gateway
+    if (this.auth.type === 'api_token') {
+      return `${this.siteUrl}${path}`;
+    }
+
+    // OAuth: use Cloud API gateway
     if (path.startsWith('/rest/api/') || path.startsWith('/rest/agile/')) {
       return `${ATLASSIAN_API_BASE}/ex/jira/${this.cloudId}${path}`;
     }
 
-    // For wiki/confluence endpoints
     if (path.startsWith('/wiki/')) {
       return `${ATLASSIAN_API_BASE}/ex/confluence/${this.cloudId}${path}`;
     }
@@ -353,6 +358,11 @@ export class AtlassianClient {
    */
   protected shouldRetry(error: AxiosError, attempt: number): boolean {
     if (attempt >= this.retryConfig.maxRetries) {
+      return false;
+    }
+
+    // Don't retry API errors (4xx) — these are wrapped by wrapResponse
+    if (error instanceof AtlassianApiError) {
       return false;
     }
 

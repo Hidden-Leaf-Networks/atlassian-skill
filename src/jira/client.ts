@@ -84,22 +84,32 @@ export class JiraClient extends AtlassianClient {
    * Search issues using JQL
    */
   async searchIssues(options: JiraSearchOptions): Promise<JiraSearchResults> {
-    const body = {
+    const body: Record<string, unknown> = {
       jql: options.jql,
       fields: options.fields || [...JIRA_LIST_FIELDS],
-      expand: options.expand || [],
-      startAt: options.startAt || 0,
+      nextPageToken: options.startAt ? String(options.startAt) : undefined,
       maxResults: Math.min(options.maxResults || 50, 100),
-      validateQuery: options.validateQuery || 'strict',
-      fieldsByKeys: options.fieldsByKeys || false,
     };
 
-    const response = await this.post<JiraSearchResults>(
-      `${this.apiPath}/search`,
+    // Clean undefined values
+    for (const key of Object.keys(body)) {
+      if (body[key] === undefined) delete body[key];
+    }
+
+    const response = await this.post<{ issues: JiraIssue[]; isLast?: boolean; nextPageToken?: string }>(
+      `${this.apiPath}/search/jql`,
       body
     );
 
-    return response.data;
+    // Normalize response to match JiraSearchResults shape
+    const data = response.data;
+    return {
+      expand: '',
+      startAt: options.startAt || 0,
+      maxResults: options.maxResults || 50,
+      total: data.isLast ? data.issues.length : data.issues.length + 1, // Approximate when not last page
+      issues: data.issues as JiraIssue[],
+    };
   }
 
   /**
