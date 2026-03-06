@@ -14,16 +14,17 @@ const MARKER = '<!-- @hidden-leaf/atlassian-skill -->';
 
 const SNIPPET = `
 ${MARKER}
-## Atlassian Integration
+## Atlassian Integration (Library-Based Skill)
 
-This project uses \`@hidden-leaf/atlassian-skill\` for Jira, Confluence, and Bitbucket operations.
+This project uses \`@hidden-leaf/atlassian-skill\` — a TypeScript library for Jira, Confluence, and Bitbucket.
+This is NOT an MCP tool or registered skill. To use it, write a TypeScript script and execute it with \`npx tsx <script>.ts\`.
 
 **Setup:** Credentials in \`.env\` — needs \`ATLASSIAN_CLOUD_ID\`, \`ATLASSIAN_SITE_URL\`, \`ATLASSIAN_USER_EMAIL\`, \`ATLASSIAN_API_TOKEN\`.
 See node_modules/@hidden-leaf/atlassian-skill/.env.example for all options.
 
-**Skill reference:** See node_modules/@hidden-leaf/atlassian-skill/SKILL.md for the full API.
+**Skill reference:** Read node_modules/@hidden-leaf/atlassian-skill/SKILL.md for the full API before using.
 
-**Quick patterns:**
+**How to use:** Write a .ts script, then run it:
 \`\`\`typescript
 import { createJiraClientFromEnv, jql, adf, text } from '@hidden-leaf/atlassian-skill';
 const jira = createJiraClientFromEnv();
@@ -33,6 +34,7 @@ const jira = createJiraClientFromEnv();
 // Transition: jira.transitionIssue('PROJ-123', { transitionId: '...' })
 // Comment: jira.addComment('PROJ-123', { body: adf().paragraph('text').build() })
 \`\`\`
+Then execute: \`npx tsx <script>.ts\`
 <!-- /@hidden-leaf/atlassian-skill -->
 `.trimStart();
 
@@ -85,10 +87,12 @@ function run() {
     // Append to existing CLAUDE.md
     fs.writeFileSync(claudeMd, existing.trimEnd() + '\n\n' + SNIPPET);
     console.log('[@hidden-leaf/atlassian-skill] Added Atlassian integration section to CLAUDE.md');
+    console.log('[@hidden-leaf/atlassian-skill] ⚡ Restart Claude Code to activate the skill (CLAUDE.md is loaded at session start)');
   } else {
     // Create new CLAUDE.md
     fs.writeFileSync(claudeMd, SNIPPET);
     console.log('[@hidden-leaf/atlassian-skill] Created CLAUDE.md with Atlassian integration');
+    console.log('[@hidden-leaf/atlassian-skill] ⚡ Restart Claude Code to activate the skill (CLAUDE.md is loaded at session start)');
   }
 
   // Copy .env.example if no .env exists

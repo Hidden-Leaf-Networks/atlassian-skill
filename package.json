@@ -1,6 +1,6 @@
 {
   "name": "@hidden-leaf/atlassian-skill",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "Unified Atlassian Claude Code Skill for Jira and Confluence integration",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
