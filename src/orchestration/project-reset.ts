@@ -101,9 +101,9 @@ export class ProjectReset {
         summary: issue.fields.summary,
         issueType: issue.fields.issuetype.name,
         status: issue.fields.status.name,
-        labels: (issue.fields as any).labels || [],
+        labels: issue.fields.labels || [],
         description: issue.fields.description || undefined,
-        parentKey: (issue.fields as any).parent?.key,
+        parentKey: issue.fields.parent?.key,
         priority: issue.fields.priority?.name,
         comments: [],
       };
@@ -125,9 +125,9 @@ export class ProjectReset {
     return {
       projectKey: project.key,
       projectName: project.name,
-      projectDescription: (project as any).description,
-      projectType: (project as any).projectTypeKey || 'software',
-      leadAccountId: (project as any).lead?.accountId || '',
+      projectDescription: project.description,
+      projectType: project.projectTypeKey || 'software',
+      leadAccountId: project.lead?.accountId || '',
       issues: snapshots,
       capturedAt: new Date().toISOString(),
     };

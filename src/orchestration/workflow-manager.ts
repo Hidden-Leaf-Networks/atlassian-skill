@@ -13,6 +13,40 @@ import { JiraClient } from '../jira/client.js';
 import { Logger, createLoggerFromEnv } from '../utils/logger.js';
 
 // =============================================================================
+// Internal API response shapes (not exported — only for typing raw API calls)
+// =============================================================================
+
+interface WorkflowSchemeProjectResponse {
+  values: Array<{ workflowScheme: { defaultWorkflow: string } }>;
+}
+
+interface WorkflowSearchResponse {
+  values: Array<{
+    id: { name: string; entityId: string };
+    statuses?: Array<{ id: string; name: string; properties?: { statusCategory?: string } }>;
+    transitions?: Array<{ id: string; name: string; type: string; to: string }>;
+  }>;
+}
+
+interface StatusSearchResponse {
+  values: Array<{ id: string; name: string; statusCategory: string }>;
+  isLast: boolean;
+}
+
+interface ProjectStatusesResponse extends Array<{
+  name: string;
+  statuses: Array<{ id: string; name: string; statusCategory?: { key?: string } }>;
+}> {}
+
+interface BoardConfigResponse {
+  columnConfig?: {
+    columns?: Array<{ name: string; statuses?: Array<{ id: string }> }>;
+  };
+}
+
+type StatusCreateResponse = Array<{ id: string; name: string; statusCategory: string }>;
+
+// =============================================================================
 // Types
 // =============================================================================
 
@@ -188,7 +222,7 @@ export class WorkflowManager {
   async getProjectWorkflow(projectKey: string): Promise<WorkflowInfo> {
     // Get workflow scheme to find the workflow name
     const project = await this.jiraClient.getProject(projectKey);
-    const schemeResponse = await (this.jiraClient as any).get(
+    const schemeResponse = await this.jiraClient.get<WorkflowSchemeProjectResponse>(
       '/rest/api/3/workflowscheme/project',
       { projectId: project.id },
     );
@@ -201,7 +235,7 @@ export class WorkflowManager {
     const workflowName = scheme.workflowScheme.defaultWorkflow;
 
     // Get workflow details with statuses and transitions
-    const wfResponse = await (this.jiraClient as any).get(
+    const wfResponse = await this.jiraClient.get<WorkflowSearchResponse>(
       '/rest/api/3/workflow/search',
       { workflowName, expand: 'statuses,transitions' },
     );
@@ -214,12 +248,12 @@ export class WorkflowManager {
     return {
       name: workflow.id.name,
       entityId: workflow.id.entityId,
-      statuses: (workflow.statuses || []).map((s: any) => ({
+      statuses: (workflow.statuses || []).map((s: { id: string; name: string; properties?: { statusCategory?: string } }) => ({
         id: s.id,
         name: s.name,
         category: s.properties?.statusCategory || 'unknown',
       })),
-      transitions: (workflow.transitions || []).map((t: any) => ({
+      transitions: (workflow.transitions || []).map((t: { id: string; name: string; type: string; to: string }) => ({
         id: t.id,
         name: t.name,
         type: t.type,
@@ -238,7 +272,7 @@ export class WorkflowManager {
     const maxResults = 200;
 
     for (;;) {
-      const response = await (this.jiraClient as any).get('/rest/api/3/statuses/search', {
+      const response = await this.jiraClient.get<StatusSearchResponse>('/rest/api/3/statuses/search', {
         startAt,
         maxResults,
       });
@@ -248,7 +282,7 @@ export class WorkflowManager {
         allStatuses.push({
           id: s.id,
           name: s.name,
-          category: s.statusCategory || s.statusCategory?.key || 'unknown',
+          category: s.statusCategory || 'unknown',
         });
       }
 
@@ -263,13 +297,13 @@ export class WorkflowManager {
    * Get statuses currently available for a project.
    */
   async getProjectStatuses(projectKey: string): Promise<Record<string, StatusInfo[]>> {
-    const response = await (this.jiraClient as any).get(
+    const response = await this.jiraClient.get<ProjectStatusesResponse>(
       `/rest/api/3/project/${projectKey}/statuses`,
     );
 
     const result: Record<string, StatusInfo[]> = {};
     for (const issueType of response.data) {
-      result[issueType.name] = issueType.statuses.map((s: any) => ({
+      result[issueType.name] = issueType.statuses.map((s: { id: string; name: string; statusCategory?: { key?: string } }) => ({
         id: s.id,
         name: s.name,
         category: s.statusCategory?.key || 'unknown',
@@ -282,13 +316,13 @@ export class WorkflowManager {
    * Get board columns configuration.
    */
   async getBoardColumns(boardId: number): Promise<Array<{ name: string; statusIds: string[] }>> {
-    const response = await (this.jiraClient as any).get(
+    const response = await this.jiraClient.get<BoardConfigResponse>(
       `/rest/agile/1.0/board/${boardId}/configuration`,
     );
 
-    return (response.data.columnConfig?.columns || []).map((col: any) => ({
+    return (response.data.columnConfig?.columns || []).map((col: { name: string; statuses?: Array<{ id: string }> }) => ({
       name: col.name,
-      statusIds: (col.statuses || []).map((s: any) => s.id),
+      statusIds: (col.statuses || []).map(s => s.id),
     }));
   }
 
@@ -341,7 +375,7 @@ export class WorkflowManager {
 
       // Try to create all at once; if some already exist, create one-by-one
       try {
-        const response = await (this.jiraClient as any).post('/rest/api/3/statuses', {
+        const response = await this.jiraClient.post<StatusCreateResponse>('/rest/api/3/statuses', {
           statuses: toCreate.map(s => ({
             name: s.name,
             statusCategory: s.category,
@@ -359,7 +393,7 @@ export class WorkflowManager {
         this.logger.info('Bulk create failed, trying individually');
         for (const status of toCreate) {
           try {
-            const response = await (this.jiraClient as any).post('/rest/api/3/statuses', {
+            const response = await this.jiraClient.post<StatusCreateResponse>('/rest/api/3/statuses', {
               statuses: [{ name: status.name, statusCategory: status.category, description: status.description || '' }],
               scope: { type: 'GLOBAL' },
             });
@@ -418,7 +452,7 @@ export class WorkflowManager {
       { type: 'FireIssueEventFunction', configuration: { event: { id: '13', name: 'issue_generic' } } },
     ];
 
-    const transitions: any[] = [{
+    const transitions: Array<Record<string, unknown>> = [{
       id: '1',
       name: 'Create',
       description: '',
@@ -456,7 +490,7 @@ export class WorkflowManager {
     this.logger.info(`Updating workflow "${workflowInfo.name}" with ${statuses.length} statuses`);
 
     try {
-      await (this.jiraClient as any).post('/rest/api/3/workflows/update', {
+      await this.jiraClient.post('/rest/api/3/workflows/update', {
         statuses: statuses.map(s => ({
           id: s.id,
           name: s.name,
@@ -501,7 +535,7 @@ export class WorkflowManager {
       const statuses = workflowInfo.statuses;
       if (statuses.length === 0) return false;
 
-      await (this.jiraClient as any).post('/rest/api/3/workflows/update', {
+      await this.jiraClient.post('/rest/api/3/workflows/update', {
         statuses: statuses.map(s => ({
           id: s.id, name: s.name, statusReference: s.id, statusCategory: s.category,
         })),
