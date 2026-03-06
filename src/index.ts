@@ -292,6 +292,7 @@ export * from './orchestration/branch-naming.js';
 export * from './orchestration/changelog-generator.js';
 export * from './orchestration/plan-executor.js';
 export * from './orchestration/board-sync.js';
+export * from './orchestration/workflow-manager.js';
 
 export {
   type PRTemplateType,

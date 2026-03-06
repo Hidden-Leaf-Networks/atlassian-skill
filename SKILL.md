@@ -154,6 +154,31 @@ Generate and parse branch names following HLN conventions:
 Changelog:
 - `generateChangelog(issues, options?)` -- generate changelog from Jira issues; formats: `'markdown' | 'confluence' | 'plain' | 'html'`
 
+### Workflow Management
+
+Use `WorkflowManager` (or `createWorkflowManager(jiraClient)`) to configure board statuses and workflows:
+
+**Read operations:**
+- `getProjectWorkflow(projectKey)` -- get current workflow statuses and transitions
+- `listStatuses()` -- list all statuses in the Jira instance
+- `getProjectStatuses(projectKey)` -- get statuses available per issue type
+- `getBoardColumns(boardId)` -- get board column configuration
+
+**Write operations:**
+- `ensureStatuses(statuses)` -- create statuses that don't exist yet; returns created + existing
+- `updateWorkflow(projectKey, statuses)` -- update the project's workflow with new statuses and global transitions
+- `applyPreset(projectKey, presetName)` -- apply a workflow preset (creates statuses + updates workflow)
+- `applyWorkflowPreset(projectKey, preset)` -- apply a custom WorkflowPreset
+
+**Presets:**
+- `listPresets()` -- list available workflow presets
+- `getPresetLabelMapping(presetName)` -- get label-to-status mapping for BoardSync integration
+
+Available presets:
+- `hln-sdlc` -- Full SDLC: Todo -> In Planning -> In Development -> Development Complete -> Ready for QA -> In QA -> Verified in QA -> Done
+- `simple-kanban` -- Default Kanban: Backlog -> Selected for Development -> In Progress -> Done
+- `dev-review` -- Dev + Review: Todo -> In Progress -> In Review -> Done
+
 ### Sprint Planning (Autonomous)
 
 Use `SprintPlanner` (via `createSprintPlanner(jiraClient, aiPlanner, logger)`) for AI-assisted planning:
@@ -273,6 +298,13 @@ const result = await archiver.archive(transcript, {
    - `future` label -> stays in Backlog
 3. Returns summary with counts of transitioned/skipped/errored issues.
 4. Custom label-to-status mappings can be passed via config.
+
+### "Set up a workflow for this project" / "Apply the SDLC workflow"
+1. Create the workflow manager: `const wfm = createWorkflowManager(jiraClient)`.
+2. List presets: `wfm.listPresets()` — show user available options.
+3. Apply chosen preset: `const result = await wfm.applyPreset('PROJ', 'hln-sdlc')`.
+4. Present the result summary (created statuses, workflow status, board columns).
+5. For BoardSync integration, get the label mapping: `wfm.getPresetLabelMapping('hln-sdlc')`.
 
 ### "Review code and update the board"
 1. Analyze the codebase to determine what's implemented vs planned.
