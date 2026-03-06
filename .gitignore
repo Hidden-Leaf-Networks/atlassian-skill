@@ -12,3 +12,5 @@ coverage/
 .vscode/
 *.swp
 *.swo
+smoke-test.ts
+test-plan-executor.ts

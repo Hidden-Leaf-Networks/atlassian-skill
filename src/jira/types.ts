@@ -58,6 +58,24 @@ export interface JiraProjectSearchResult extends PaginatedResponse<JiraProject> 
   self: string;
 }
 
+/**
+ * Input for creating a Jira project
+ */
+export interface JiraProjectCreateInput {
+  /** Unique project key (e.g., 'PROJ') */
+  key: string;
+  /** Display name */
+  name: string;
+  /** Project description */
+  description?: string;
+  /** Project type */
+  projectTypeKey: 'software' | 'service_desk' | 'business';
+  /** Project template — determines board type */
+  projectTemplateKey?: string;
+  /** Account ID of the project lead */
+  leadAccountId: string;
+}
+
 // ============================================================================
 // Issue Types
 // ============================================================================

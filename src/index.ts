@@ -103,6 +103,7 @@ export {
   type JiraUser,
   type JiraProject,
   type JiraProjectSearchResult,
+  type JiraProjectCreateInput,
   type JiraIssueType,
   type JiraPriority,
   type JiraStatus,

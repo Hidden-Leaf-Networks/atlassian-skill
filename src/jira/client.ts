@@ -13,6 +13,7 @@ import {
   JiraSearchResults,
   JiraSearchOptions,
   JiraIssueCreateInput,
+  JiraProjectCreateInput,
   JiraIssueCreateResponse,
   JiraIssueUpdateInput,
   JiraTransition,
@@ -328,6 +329,25 @@ export class JiraClient extends AtlassianClient {
   async getProject(projectIdOrKey: string): Promise<JiraProject> {
     const response = await this.get<JiraProject>(
       `${this.apiPath}/project/${projectIdOrKey}`
+    );
+
+    return response.data;
+  }
+
+  /**
+   * Create a new project
+   */
+  async createProject(input: JiraProjectCreateInput): Promise<JiraProject> {
+    const response = await this.post<JiraProject>(
+      `${this.apiPath}/project`,
+      {
+        key: input.key,
+        name: input.name,
+        description: input.description,
+        projectTypeKey: input.projectTypeKey,
+        projectTemplateKey: input.projectTemplateKey || 'com.pyxis.greenhopper.jira:gh-simplified-kanban-classic',
+        leadAccountId: input.leadAccountId,
+      }
     );
 
     return response.data;
