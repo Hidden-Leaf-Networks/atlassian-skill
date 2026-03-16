@@ -5,6 +5,9 @@
 
 import { createLoggerFromEnv, Logger } from '../utils/logger.js';
 import { AdfBuilder, TextBuilder } from '../core/adf-builder.js';
+import type { AdfDocument } from '../core/types.js';
+import type { ConfluenceClient } from '../confluence/client.js';
+import type { JiraClient } from '../jira/client.js';
 import {
   SessionTranscript,
   SessionMetadata,
@@ -27,18 +30,19 @@ import {
  */
 export class SessionArchiver {
   private readonly logger: Logger;
-  /** Confluence client - will be typed when integrated */
-  confluenceClient?: unknown;
-  /** Jira client - will be typed when integrated */
-  jiraClient?: unknown;
+  private readonly confluenceClient?: ConfluenceClient;
+  private readonly jiraClient?: JiraClient;
+  private readonly siteUrl?: string;
 
   constructor(options?: {
-    confluenceClient?: unknown;
-    jiraClient?: unknown;
+    confluenceClient?: ConfluenceClient;
+    jiraClient?: JiraClient;
+    siteUrl?: string;
   }) {
     this.logger = createLoggerFromEnv('session-archiver');
     this.confluenceClient = options?.confluenceClient;
     this.jiraClient = options?.jiraClient;
+    this.siteUrl = options?.siteUrl;
   }
 
   /**
@@ -106,21 +110,36 @@ export class SessionArchiver {
     summary: TranscriptSummary,
     config: ArchiveConfig
   ): Promise<{ pageId: string; pageUrl: string }> {
-    const pageTitle = this.generatePageTitle(transcript.metadata, summary);
-    this.buildConfluenceContent(transcript, summary, config);
+    if (!this.confluenceClient) {
+      throw new Error('Confluence client required for archiving to Confluence. Pass it via constructor options.');
+    }
 
-    // TODO: Use actual Confluence client when integrated
-    this.logger.info('Would create Confluence page', {
-      spaceKey: config.confluenceSpaceKey,
-      parentPageId: config.confluenceParentPageId,
+    const pageTitle = this.generatePageTitle(transcript.metadata, summary);
+    const content = this.buildConfluenceContent(transcript, summary, config);
+
+    // Resolve space ID from space key
+    const space = await this.confluenceClient.getSpaceByKey(config.confluenceSpaceKey!);
+    if (!space) {
+      throw new Error(`Confluence space not found: ${config.confluenceSpaceKey}`);
+    }
+
+    const page = await this.confluenceClient.createPage({
+      spaceId: space.id,
+      title: pageTitle,
+      body: content,
+      parentId: config.confluenceParentPageId,
+    });
+
+    const pageUrl = page._links?.webui
+      ? `${this.siteUrl || ''}${page._links.webui}`
+      : `${this.siteUrl || ''}/wiki/spaces/${config.confluenceSpaceKey}/pages/${page.id}`;
+
+    this.logger.info('Archived session to Confluence', {
+      pageId: page.id,
       title: pageTitle,
     });
 
-    // Placeholder - actual implementation would call Confluence API
-    return {
-      pageId: 'placeholder-page-id',
-      pageUrl: `https://your-site.atlassian.net/wiki/spaces/${config.confluenceSpaceKey}/pages/placeholder`,
-    };
+    return { pageId: page.id, pageUrl };
   }
 
   /**
@@ -131,19 +150,30 @@ export class SessionArchiver {
     summary: TranscriptSummary,
     config: ArchiveConfig
   ): Promise<{ issueKey: string; issueUrl: string }> {
+    if (!this.jiraClient) {
+      throw new Error('Jira client required for archiving to Jira. Pass it via constructor options.');
+    }
+
     const issueData = this.buildJiraIssue(transcript, summary, config);
 
-    // TODO: Use actual Jira client when integrated
-    this.logger.info('Would create Jira issue', {
-      projectKey: config.jiraProjectKey,
+    const issue = await this.jiraClient.createIssue({
+      project: config.jiraProjectKey!,
+      issuetype: 'Task',
+      summary: issueData.summary,
+      description: issueData.description,
+      labels: ['session-archive'],
+    });
+
+    const issueUrl = this.siteUrl
+      ? `${this.siteUrl}/browse/${issue.key}`
+      : issue.self;
+
+    this.logger.info('Archived session to Jira', {
+      issueKey: issue.key,
       summary: issueData.summary,
     });
 
-    // Placeholder - actual implementation would call Jira API
-    return {
-      issueKey: `${config.jiraProjectKey}-999`,
-      issueUrl: `https://your-site.atlassian.net/browse/${config.jiraProjectKey}-999`,
-    };
+    return { issueKey: issue.key, issueUrl };
   }
 
   /**
@@ -153,7 +183,7 @@ export class SessionArchiver {
     transcript: SessionTranscript,
     summary: TranscriptSummary,
     config: ArchiveConfig
-  ): unknown {
+  ): AdfDocument {
     const adf = new AdfBuilder();
 
     // Header with session info
@@ -242,7 +272,7 @@ export class SessionArchiver {
     transcript: SessionTranscript,
     summary: TranscriptSummary,
     _config: ArchiveConfig
-  ): { summary: string; description: unknown } {
+  ): { summary: string; description: AdfDocument } {
     const adf = new AdfBuilder();
 
     adf.heading(2, 'Session Summary');
@@ -416,9 +446,17 @@ export class SessionArchiver {
 // ============================================================================
 
 /**
- * Create session archiver from environment configuration
+ * Create session archiver from environment configuration.
+ * Pass Confluence and/or Jira clients to enable archiving to those destinations.
  */
-export function createArchiverFromEnv(): SessionArchiver {
-  // TODO: Initialize with actual clients when available
-  return new SessionArchiver();
+export function createArchiverFromEnv(options?: {
+  confluenceClient?: ConfluenceClient;
+  jiraClient?: JiraClient;
+}): SessionArchiver {
+  const siteUrl = process.env.ATLASSIAN_SITE_URL;
+  return new SessionArchiver({
+    confluenceClient: options?.confluenceClient,
+    jiraClient: options?.jiraClient,
+    siteUrl,
+  });
 }

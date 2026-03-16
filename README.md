@@ -2,9 +2,9 @@
 
 **Open infrastructure for AI-native software teams.**
 
+[![npm](https://img.shields.io/npm/v/@hidden-leaf/atlassian-skill)](https://www.npmjs.com/package/@hidden-leaf/atlassian-skill)
 [![Build](https://github.com/Hidden-Leaf-Networks/atlassian-skill/actions/workflows/ci.yml/badge.svg)](https://github.com/Hidden-Leaf-Networks/atlassian-skill/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-[![Version](https://img.shields.io/badge/version-0.5.5-green.svg)](https://github.com/Hidden-Leaf-Networks/atlassian-skill)
 
 ---
 
@@ -310,6 +310,14 @@ await archiver.archive(transcript, {
 
 1. Go to https://id.atlassian.com/manage-profile/security/api-tokens.
 2. Create a token and store it securely.
+
+---
+
+## Known Limitations
+
+- **Jira Workflow Lock (ATLSK-62):** Jira Cloud's `POST /workflows/update` endpoint may return a 409 "workflow lock" error tenant-wide. This is a platform bug with no API workaround. Use `ProjectReset` to recreate the project, or configure board columns manually via the Jira UI.
+- **Workflow Creation:** `POST /workflows/create` has an undocumented `links` format that prevents workflow creation via API. Use Jira UI for initial workflow setup.
+- **Rate Limits:** The client respects Atlassian's 65,000 points/hour rate limit with automatic backoff, but high-volume batch operations may still hit limits.
 
 ---
 
