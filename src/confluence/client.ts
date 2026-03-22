@@ -10,7 +10,6 @@ import type {
   PageVersion,
   SearchResult,
   PaginatedResponse,
-  ConfluenceError,
   ListSpacesOptions,
   GetPageOptions,
   CreatePageOptions,
@@ -25,13 +24,27 @@ import type {
 // ============================================================================
 
 /**
+ * API token authentication credentials.
+ */
+export interface ConfluenceApiTokenAuth {
+  /** User email address */
+  email: string;
+  /** API token */
+  apiToken: string;
+}
+
+/**
  * Configuration options for the Confluence client.
  */
 export interface ConfluenceClientConfig {
   /** Atlassian Cloud ID */
   cloudId: string;
-  /** OAuth access token */
-  accessToken: string;
+  /** OAuth access token (mutually exclusive with apiToken) */
+  accessToken?: string;
+  /** API token auth credentials (mutually exclusive with accessToken) */
+  apiToken?: ConfluenceApiTokenAuth;
+  /** Site URL — required for API token auth (e.g., https://your-domain.atlassian.net) */
+  siteUrl?: string;
   /** Optional refresh token for token renewal */
   refreshToken?: string;
   /** Base URL override (for testing) */
@@ -74,7 +87,9 @@ const DEFAULT_CONFIG = {
  */
 export class ConfluenceClient {
   private readonly cloudId: string;
-  private accessToken: string;
+  private accessToken: string | undefined;
+  private readonly apiTokenAuth: ConfluenceApiTokenAuth | undefined;
+  private readonly siteUrl: string | undefined;
   private readonly baseUrl: string;
   private readonly timeout: number;
   private readonly maxRetries: number;
@@ -82,18 +97,24 @@ export class ConfluenceClient {
 
   /**
    * Creates a new Confluence client instance.
+   * Supports both OAuth (accessToken) and API token (email + apiToken) auth.
    * @param config - Client configuration options
    */
   constructor(config: ConfluenceClientConfig) {
     if (!config.cloudId) {
       throw new Error('cloudId is required');
     }
-    if (!config.accessToken) {
-      throw new Error('accessToken is required');
+    if (!config.accessToken && !config.apiToken) {
+      throw new Error('Either accessToken or apiToken credentials are required');
+    }
+    if (config.apiToken && !config.siteUrl) {
+      throw new Error('siteUrl is required when using API token auth');
     }
 
     this.cloudId = config.cloudId;
     this.accessToken = config.accessToken;
+    this.apiTokenAuth = config.apiToken;
+    this.siteUrl = config.siteUrl;
     this.baseUrl = config.baseUrl ?? DEFAULT_CONFIG.baseUrl;
     this.timeout = config.timeout ?? DEFAULT_CONFIG.timeout;
     this.maxRetries = config.maxRetries ?? DEFAULT_CONFIG.maxRetries;
@@ -105,12 +126,24 @@ export class ConfluenceClient {
   // ==========================================================================
 
   /**
+   * Whether this client is using API token auth.
+   */
+  private get isApiTokenAuth(): boolean {
+    return !!this.apiTokenAuth;
+  }
+
+  /**
    * Constructs the full API URL for a given endpoint.
+   * API token auth routes directly to siteUrl; OAuth routes through api.atlassian.com.
    * @param endpoint - API endpoint path
    * @returns Full URL
    */
   private getApiUrl(endpoint: string): string {
-    // Confluence API v2 base path
+    if (this.isApiTokenAuth) {
+      // API token: route directly to site
+      return `${this.siteUrl}/wiki/api/v2${endpoint}`;
+    }
+    // OAuth: route through Cloud API gateway
     const basePath = `/ex/confluence/${this.cloudId}/wiki/api/v2`;
     return `${this.baseUrl}${basePath}${endpoint}`;
   }
@@ -120,11 +153,22 @@ export class ConfluenceClient {
    * @returns Headers object
    */
   private getHeaders(): Record<string, string> {
-    return {
-      'Authorization': `Bearer ${this.accessToken}`,
+    const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
     };
+
+    if (this.apiTokenAuth) {
+      // API token: Basic auth with email:token
+      const credentials = Buffer.from(
+        `${this.apiTokenAuth.email}:${this.apiTokenAuth.apiToken}`
+      ).toString('base64');
+      headers['Authorization'] = `Basic ${credentials}`;
+    } else {
+      headers['Authorization'] = `Bearer ${this.accessToken}`;
+    }
+
+    return headers;
   }
 
   /**
@@ -184,13 +228,21 @@ export class ConfluenceClient {
         // Handle other errors
         if (!response.ok) {
           const errorBody = await response.text();
-          let errorData: ConfluenceError;
+          let errorMessage: string;
           try {
-            errorData = JSON.parse(errorBody);
+            const parsed = JSON.parse(errorBody);
+            // Confluence API v2 uses { errors: [{ title, detail, code }] }
+            if (parsed.errors?.length) {
+              errorMessage = parsed.errors.map((e: { title?: string; detail?: string; code?: string }) =>
+                e.title || e.detail || e.code || 'Unknown error'
+              ).join('; ');
+            } else {
+              errorMessage = parsed.message || parsed.error || errorBody;
+            }
           } catch {
-            errorData = { message: errorBody || response.statusText, statusCode: response.status };
+            errorMessage = errorBody || response.statusText;
           }
-          throw new Error(`Confluence API error: ${errorData.message} (${response.status})`);
+          throw new Error(`Confluence API error: ${errorMessage} (${response.status})`);
         }
 
         // Handle empty responses
@@ -356,7 +408,6 @@ export class ConfluenceClient {
     return this.request<Page>('GET', `/pages/${pageId}`, undefined, {
       'body-format': options?.bodyFormat,
       'get-draft': false,
-      'version': options?.includeVersion ? 'current' : undefined,
     });
   }
 
@@ -376,18 +427,23 @@ export class ConfluenceClient {
    * ```
    */
   async updatePage(options: UpdatePageOptions): Promise<Page> {
+    // Confluence API v2 requires title in update payload.
+    // If not provided, fetch the current title.
+    let title = options.title;
+    if (!title) {
+      const current = await this.getPage(options.id);
+      title = current.title;
+    }
+
     const payload: Record<string, unknown> = {
       id: options.id,
       status: 'current',
+      title,
       version: {
         number: options.version + 1,
         message: options.versionMessage,
       },
     };
-
-    if (options.title) {
-      payload.title = options.title;
-    }
 
     if (options.body) {
       const body = this.serializeBody(options.body, options.representation);
@@ -524,11 +580,12 @@ export class ConfluenceClient {
     cql: string,
     options?: { cursor?: string; limit?: number }
   ): Promise<SearchResult> {
-    // Note: The actual CQL search endpoint may vary
-    // This uses the REST API v1 style search which is still supported
-    const searchUrl = `/ex/confluence/${this.cloudId}/wiki/rest/api/content/search`;
+    // CQL search uses REST API v1 content/search endpoint
+    const searchPath = this.isApiTokenAuth
+      ? `${this.siteUrl}/wiki/rest/api/content/search`
+      : `${this.baseUrl}/ex/confluence/${this.cloudId}/wiki/rest/api/content/search`;
 
-    const response = await fetch(`${this.baseUrl}${searchUrl}?cql=${encodeURIComponent(cql)}&limit=${options?.limit ?? 25}`, {
+    const response = await fetch(`${searchPath}?cql=${encodeURIComponent(cql)}&limit=${options?.limit ?? 25}`, {
       method: 'GET',
       headers: this.getHeaders(),
     });
@@ -581,22 +638,40 @@ export class ConfluenceClient {
 
 /**
  * Creates a Confluence client from environment variables.
- * Expects: ATLASSIAN_CLOUD_ID, ATLASSIAN_ACCESS_TOKEN
+ * Supports both OAuth (ATLASSIAN_ACCESS_TOKEN) and API token (ATLASSIAN_API_TOKEN + ATLASSIAN_USER_EMAIL) auth.
  * @returns Configured Confluence client
  */
 export function createConfluenceClientFromEnv(): ConfluenceClient {
   const cloudId = process.env.ATLASSIAN_CLOUD_ID;
-  const accessToken = process.env.ATLASSIAN_ACCESS_TOKEN;
 
-  if (!cloudId || !accessToken) {
-    throw new Error(
-      'Missing required environment variables: ATLASSIAN_CLOUD_ID, ATLASSIAN_ACCESS_TOKEN'
-    );
+  if (!cloudId) {
+    throw new Error('Missing required environment variable: ATLASSIAN_CLOUD_ID');
   }
 
-  return new ConfluenceClient({
-    cloudId,
-    accessToken,
-    refreshToken: process.env.ATLASSIAN_REFRESH_TOKEN,
-  });
+  // Prefer OAuth if access token is available
+  const accessToken = process.env.ATLASSIAN_ACCESS_TOKEN;
+  if (accessToken) {
+    return new ConfluenceClient({
+      cloudId,
+      accessToken,
+      refreshToken: process.env.ATLASSIAN_REFRESH_TOKEN,
+    });
+  }
+
+  // Fall back to API token auth
+  const apiToken = process.env.ATLASSIAN_API_TOKEN;
+  const email = process.env.ATLASSIAN_USER_EMAIL;
+  const siteUrl = process.env.ATLASSIAN_SITE_URL;
+
+  if (apiToken && email && siteUrl) {
+    return new ConfluenceClient({
+      cloudId,
+      apiToken: { email, apiToken },
+      siteUrl,
+    });
+  }
+
+  throw new Error(
+    'Missing required environment variables: either ATLASSIAN_ACCESS_TOKEN (OAuth) or ATLASSIAN_API_TOKEN + ATLASSIAN_USER_EMAIL + ATLASSIAN_SITE_URL (API token)'
+  );
 }

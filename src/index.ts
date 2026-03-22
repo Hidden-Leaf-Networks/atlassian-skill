@@ -144,7 +144,25 @@ export {
 
 export {
   ConfluenceClient,
+  createConfluenceClientFromEnv,
 } from './confluence/client.js';
+
+export {
+  PageService,
+  createPageService,
+} from './confluence/pages.js';
+
+export {
+  SpaceService,
+  createSpaceService,
+} from './confluence/spaces.js';
+
+export {
+  MarkdownToADFConverter,
+  DocumentationSyncService,
+  createSyncService,
+  createMarkdownConverter,
+} from './confluence/sync.js';
 
 export {
   type Space,
@@ -396,4 +414,4 @@ export * from './utils/validators.js';
 // Version
 // ============================================================================
 
-export const VERSION = '1.0.0';
+export const VERSION = '1.1.0';

@@ -171,7 +171,7 @@ export class PageService {
 
     return this.client.updatePage({
       id: params.pageId,
-      title: params.title,
+      title: params.title ?? currentPage.title,
       body: params.body,
       version: currentVersion,
       versionMessage: params.versionMessage,
