@@ -114,6 +114,101 @@ export class RepositoryOperations {
     return this.client.getAllPages<Repository>(path, options);
   }
 
+  /**
+   * Creates a new repository in a workspace
+   *
+   * @param workspace - The workspace ID or slug
+   * @param repoSlug - The slug for the new repository
+   * @param options - Repository creation options
+   * @returns The created repository
+   *
+   * @example
+   * ```typescript
+   * const repo = await repos.createRepository('acme', 'new-project', {
+   *   description: 'My new project',
+   *   is_private: true,
+   *   language: 'typescript',
+   *   fork_policy: 'no_forks',
+   * });
+   * ```
+   */
+  async createRepository(
+    workspace: string,
+    repoSlug: string,
+    options: {
+      scm?: 'git';
+      description?: string;
+      is_private?: boolean;
+      language?: string;
+      fork_policy?: 'allow_forks' | 'no_public_forks' | 'no_forks';
+      project?: { key: string };
+      has_issues?: boolean;
+      has_wiki?: boolean;
+    } = {}
+  ): Promise<Repository> {
+    const path = this.getRepoPath(workspace, repoSlug);
+    return this.client.post<Repository>(path, {
+      scm: options.scm || 'git',
+      ...options,
+    });
+  }
+
+  /**
+   * Deletes a repository
+   *
+   * WARNING: This permanently deletes the repository and all its data.
+   *
+   * @param workspace - The workspace ID or slug
+   * @param repoSlug - The repository slug to delete
+   *
+   * @example
+   * ```typescript
+   * await repos.deleteRepository('acme', 'old-project');
+   * ```
+   */
+  async deleteRepository(
+    workspace: string,
+    repoSlug: string
+  ): Promise<void> {
+    const path = this.getRepoPath(workspace, repoSlug);
+    await this.client.delete(path);
+  }
+
+  /**
+   * Updates a repository's settings
+   *
+   * @param workspace - The workspace ID or slug
+   * @param repoSlug - The repository slug
+   * @param updates - Fields to update
+   * @returns The updated repository
+   *
+   * @example
+   * ```typescript
+   * const updated = await repos.updateRepository('acme', 'my-project', {
+   *   description: 'Updated description',
+   *   is_private: false,
+   * });
+   * ```
+   */
+  async updateRepository(
+    workspace: string,
+    repoSlug: string,
+    updates: {
+      name?: string;
+      description?: string;
+      is_private?: boolean;
+      language?: string;
+      fork_policy?: 'allow_forks' | 'no_public_forks' | 'no_forks';
+      project?: { key: string };
+      has_issues?: boolean;
+      has_wiki?: boolean;
+      mainbranch?: { name: string };
+    }
+  ): Promise<Repository> {
+    const path = this.getRepoPath(workspace, repoSlug);
+    return this.client.put<Repository>(path, updates);
+  }
+
   // ===========================================================================
   // Branch Operations
   // ===========================================================================

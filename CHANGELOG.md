@@ -4,6 +4,35 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.2.0] - 2026-03-26
+
+### Added
+
+- **Bitbucket**: `createBitbucketClientFromEnv()` factory — reads `BITBUCKET_API_TOKEN` + `ATLASSIAN_USER_EMAIL` (new Atlassian unified tokens), legacy app passwords, or OAuth. Same pattern as Jira and Confluence factories.
+- **Bitbucket**: `RepositoryOperations.createRepository()` — create repos from CLI
+- **Bitbucket**: `RepositoryOperations.deleteRepository()` — delete repos from CLI
+- **Bitbucket**: `RepositoryOperations.updateRepository()` — update repo settings (name, description, visibility, fork policy, main branch)
+- **Bitbucket**: Exported all high-level operation classes from main index: `RepositoryOperations`, `PullRequestOperations`, `PipelineOperations`, `DeploymentOperations` plus their factory functions
+- **Bitbucket**: Exported `createBitbucketClient` factory and `BitbucketApiError` from main index (were previously internal-only)
+- **.env.example**: Added Bitbucket auth section documenting all three auth methods with scope requirements
+
+### Fixed
+
+- **Bitbucket**: Fixed URL construction bug where `new URL('/path', 'https://api.bitbucket.org/2.0')` dropped the `/2.0` prefix, causing 403 errors on all API calls. Now concatenates base + path correctly.
+
+### Notes
+
+- Bitbucket app passwords were deprecated by Atlassian on 2025-09-09 and sunset on 2026-06-09. The new `createBitbucketClientFromEnv()` factory prioritizes the replacement: Atlassian API tokens with Bitbucket scopes.
+- Tested against `hiddenleafnetworks` workspace: repo CRUD, branch listing, PR listing all confirmed working.
+
+## [1.1.0] - 2026-03-22
+
+### Added
+
+- **Confluence**: `createConfluenceClientFromEnv()` factory with API token auth support (same pattern as Jira)
+- **Confluence**: API token (Basic) auth in `ConfluenceClient` — routes to site URL instead of `api.atlassian.com` when using Basic auth
+- **Confluence**: Exported `createConfluenceClientFromEnv` and all Confluence service classes from main index
+
 ## [1.0.0] - 2026-03-16
 
 First stable release. Open-core foundation for AI-native SDLC automation.
