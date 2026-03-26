@@ -128,7 +128,10 @@ export class BitbucketClient {
       return path;
     }
 
-    const url = new URL(path.startsWith('/') ? path : `/${path}`, this.baseUrl);
+    // Concatenate base + path to preserve the /2.0 prefix.
+    // new URL('/path', 'https://host/2.0') drops /2.0 — so we concatenate instead.
+    const fullPath = path.startsWith('/') ? path : `/${path}`;
+    const url = new URL(`${this.baseUrl}${fullPath}`);
 
     if (params) {
       Object.entries(params).forEach(([key, value]) => {
@@ -559,4 +562,64 @@ export function createBitbucketClient(
   config: BitbucketClientConfig
 ): BitbucketClient {
   return new BitbucketClient(config);
+}
+
+/**
+ * Creates a BitbucketClient from environment variables.
+ *
+ * Reads (in priority order):
+ *   1. BITBUCKET_API_TOKEN + ATLASSIAN_USER_EMAIL — new Atlassian API token with Bitbucket scopes
+ *   2. BITBUCKET_APP_PASSWORD + BITBUCKET_USERNAME — legacy app password auth
+ *   3. BITBUCKET_ACCESS_TOKEN — OAuth 2.0 bearer token
+ *
+ * Optional:
+ *   - BITBUCKET_WORKSPACE — default workspace slug
+ *
+ * @returns Configured BitbucketClient instance
+ * @throws Error if no valid auth configuration is found
+ */
+export function createBitbucketClientFromEnv(): BitbucketClient {
+  // Priority 1: Atlassian API token with Bitbucket scopes (new unified auth)
+  const apiToken = process.env.BITBUCKET_API_TOKEN;
+  const email = process.env.ATLASSIAN_USER_EMAIL;
+  if (apiToken && email) {
+    return new BitbucketClient({
+      auth: {
+        username: email,
+        appPassword: apiToken,
+      },
+    });
+  }
+
+  // Priority 2: Legacy app password
+  const appPassword = process.env.BITBUCKET_APP_PASSWORD;
+  const username = process.env.BITBUCKET_USERNAME;
+  if (appPassword && username) {
+    return new BitbucketClient({
+      auth: {
+        username,
+        appPassword,
+      },
+    });
+  }
+
+  // Priority 3: OAuth access token
+  const accessToken = process.env.BITBUCKET_ACCESS_TOKEN;
+  if (accessToken) {
+    return new BitbucketClient({
+      auth: {
+        accessToken,
+        refreshToken: process.env.BITBUCKET_REFRESH_TOKEN,
+        clientId: process.env.BITBUCKET_CLIENT_ID,
+        clientSecret: process.env.BITBUCKET_CLIENT_SECRET,
+      },
+    });
+  }
+
+  throw new Error(
+    'Missing Bitbucket auth environment variables. Set one of:\n' +
+    '  - BITBUCKET_API_TOKEN + ATLASSIAN_USER_EMAIL (recommended)\n' +
+    '  - BITBUCKET_USERNAME + BITBUCKET_APP_PASSWORD (legacy)\n' +
+    '  - BITBUCKET_ACCESS_TOKEN (OAuth)'
+  );
 }

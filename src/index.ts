@@ -207,7 +207,30 @@ export {
 
 export {
   BitbucketClient,
+  BitbucketApiError,
+  createBitbucketClient,
+  createBitbucketClientFromEnv,
 } from './bitbucket/client.js';
+
+export {
+  RepositoryOperations,
+  createRepositoryOperations,
+} from './bitbucket/repositories.js';
+
+export {
+  PullRequestOperations,
+  createPullRequestOperations,
+} from './bitbucket/pull-requests.js';
+
+export {
+  PipelineOperations,
+  createPipelineOperations,
+} from './bitbucket/pipelines.js';
+
+export {
+  DeploymentOperations,
+  createDeploymentOperations,
+} from './bitbucket/deployments.js';
 
 export {
   type BitbucketLink,
