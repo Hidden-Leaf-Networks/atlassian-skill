@@ -38,7 +38,7 @@
     "ai-sdlc"
   ],
   "author": "Hidden Leaf Networks",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Hidden-Leaf-Networks/atlassian-skill.git"
