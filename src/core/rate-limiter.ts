@@ -39,9 +39,9 @@ export const ENDPOINT_COSTS: Record<string, EndpointCost> = {
   'PUT /rest/api/3/issue': { baseCost: 5, perResultCost: 0, maxResults: 1 },
   'DELETE /rest/api/3/issue': { baseCost: 10, perResultCost: 0, maxResults: 1 },
 
-  // Jira Search
-  'GET /rest/api/3/search': { baseCost: 5, perResultCost: 1, maxResults: 100 },
-  'POST /rest/api/3/search': { baseCost: 5, perResultCost: 1, maxResults: 100 },
+  // Jira Search (POST /rest/api/3/search/jql — replaces deprecated /search)
+  'GET /rest/api/3/search/jql': { baseCost: 5, perResultCost: 1, maxResults: 100 },
+  'POST /rest/api/3/search/jql': { baseCost: 5, perResultCost: 1, maxResults: 100 },
 
   // Jira Project endpoints
   'GET /rest/api/3/project': { baseCost: 1, perResultCost: 0, maxResults: 1 },
