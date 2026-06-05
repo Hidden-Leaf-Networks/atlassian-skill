@@ -12,7 +12,36 @@ coverage/
 .vscode/
 *.swp
 *.swo
+# Internal scripts — Jira/Confluence project setup, client operations, venture management
+# These contain client names, pricing, venture roadmaps — private only
+scripts/*.ts
+*.internal.ts
+
+# Loose internal operation scripts in root
+# Pattern: any .ts in root that isn't src/test infrastructure
+aria-*.ts
+check-*.ts
+close-*.ts
+comment-*.ts
+create-*.ts
+ctbc-*.ts
+fetch-*.ts
+find-*.ts
+gg-*.ts
+hunt-*.ts
+jira-*.ts
+moplay-*.ts
+script.ts
+search-*.ts
+search_*.ts
+session_*.ts
+update-*.ts
+xskill-*.ts
 smoke-test.ts
 test-plan-executor.ts
 sync-board.ts
 update-bug.ts
+.next/
+ctbc-audit-pdf.py
+herb-archive-output.html
+scripts/session-hook.js
