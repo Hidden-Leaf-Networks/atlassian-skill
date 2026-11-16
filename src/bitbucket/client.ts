@@ -579,9 +579,12 @@ export function createBitbucketClient(
  * @throws Error if no valid auth configuration is found
  */
 export function createBitbucketClientFromEnv(): BitbucketClient {
-  // Priority 1: Atlassian API token with Bitbucket scopes (new unified auth)
-  const apiToken = process.env.BITBUCKET_API_TOKEN;
-  const email = process.env.ATLASSIAN_USER_EMAIL;
+  // Priority 1: Scoped Atlassian API token with Bitbucket scopes
+  // Note: Atlassian removed app passwords July 28, 2026.
+  // Scoped tokens use email + token as basic auth credentials
+  // against api.bitbucket.org (no gateway needed for BB, unlike Jira).
+  const apiToken = process.env.BITBUCKET_API_TOKEN || process.env.BITBUCKET_API_KEY;
+  const email = process.env.ATLASSIAN_USER_EMAIL || process.env.JIRA_USER_EMAIL_TREVYON;
   if (apiToken && email) {
     return new BitbucketClient({
       auth: {
@@ -591,19 +594,7 @@ export function createBitbucketClientFromEnv(): BitbucketClient {
     });
   }
 
-  // Priority 2: Legacy app password
-  const appPassword = process.env.BITBUCKET_APP_PASSWORD;
-  const username = process.env.BITBUCKET_USERNAME;
-  if (appPassword && username) {
-    return new BitbucketClient({
-      auth: {
-        username,
-        appPassword,
-      },
-    });
-  }
-
-  // Priority 3: OAuth access token
+  // Priority 2: OAuth access token (recommended for long-lived integrations)
   const accessToken = process.env.BITBUCKET_ACCESS_TOKEN;
   if (accessToken) {
     return new BitbucketClient({
@@ -618,8 +609,8 @@ export function createBitbucketClientFromEnv(): BitbucketClient {
 
   throw new Error(
     'Missing Bitbucket auth environment variables. Set one of:\n' +
-    '  - BITBUCKET_API_TOKEN + ATLASSIAN_USER_EMAIL (recommended)\n' +
-    '  - BITBUCKET_USERNAME + BITBUCKET_APP_PASSWORD (legacy)\n' +
-    '  - BITBUCKET_ACCESS_TOKEN (OAuth)'
+    '  - BITBUCKET_API_TOKEN + ATLASSIAN_USER_EMAIL (scoped token, recommended)\n' +
+    '  - BITBUCKET_ACCESS_TOKEN (OAuth)\n' +
+    'Note: App passwords were removed by Atlassian on July 28, 2026.'
   );
 }

@@ -211,13 +211,12 @@ export class AtlassianClient {
       return path;
     }
 
-    // API token auth goes directly to the site URL
-    // OAuth auth routes through the Cloud API gateway
-    if (this.auth.type === 'api_token') {
-      return `${this.siteUrl}${path}`;
-    }
-
-    // OAuth: use Cloud API gateway
+    // Classic (unscoped) API tokens can go directly to the site URL.
+    // Scoped API tokens (created after Dec 2024) MUST route through
+    // the Cloud API gateway at api.atlassian.com — they 401 on the
+    // site URL. Since Atlassian expired all classic tokens by May 2026,
+    // we now route ALL requests through the gateway for compatibility.
+    // See: https://github.com/pipewell/jira-ingest/issues/23
     if (path.startsWith('/rest/api/') || path.startsWith('/rest/agile/')) {
       return `${ATLASSIAN_API_BASE}/ex/jira/${this.cloudId}${path}`;
     }
